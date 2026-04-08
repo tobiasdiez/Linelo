@@ -1,6 +1,21 @@
 {
-    "cSpell.words": [
-        "linelo",
-        "Nuxt"
-    ]
+  "cSpell.words": [
+    "dedupe",
+    "linelo",
+    "lockfiles",
+    "Nuxt",
+    "Oxfmt",
+    "Oxlint",
+    "tsdown",
+    "Vite",
+    "Vitest",
+    "voidzero"
+  ],
+  "editor.defaultFormatter": "oxc.oxc-vscode",
+  "oxc.fmt.configPath": "./vite.config.ts",
+  "editor.formatOnSave": true,
+  "editor.formatOnSaveMode": "file",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.oxc": "explicit"
+  }
 }
