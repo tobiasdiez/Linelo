@@ -81,8 +81,15 @@ For GitHub Actions, consider using [`voidzero-dev/setup-vp`](https://github.com/
 - run: vp test
 ```
 
+## Brand Guidance for Agents
+
+- Read [`BRAND.md`](../BRAND.md) before writing or revising product copy, UX text, messaging, onboarding text, release notes, marketing content, or any user-facing AI text.
+- Use [`BRAND.md`](../BRAND.md) as the source of truth for tone, terminology, positioning, product promise, and strategic guardrails.
+- When there is a conflict between generic writing preferences and brand guidance, follow [`BRAND.md`](../BRAND.md).
+
 ## Review Checklist for Agents
 
 - [ ] Run `vp install` after pulling remote changes and before getting started.
+- [ ] If the change affects user-facing language, verify it aligns with [`BRAND.md`](../BRAND.md).
 - [ ] Run `vp check` and `vp test` to validate changes.
 <!--VITE PLUS END-->
