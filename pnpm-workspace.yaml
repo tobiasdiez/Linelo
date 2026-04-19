@@ -3,10 +3,10 @@ catalog:
   vitest: npm:@voidzero-dev/vite-plus-test@latest
   vite-plus: latest
 
-allowBuilds:
-  '@parcel/watcher': false
-  'esbuild': false
-  'vue-demi': false
+ignoredBuiltDependencies:
+  - '@parcel/watcher'
+  - 'esbuild'
+  - 'vue-demi'
 
 overrides:
   vite: 'catalog:'
