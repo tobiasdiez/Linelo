@@ -51,10 +51,10 @@ watch(currentMessage, (message) => {
     <!-- Main Content Area -->
     <main class="pt-14 pb-44 px-4 md:px-6 flex items-center justify-center min-h-screen">
       <!-- Empty State: Inbox Zero -->
-      <EmptyState v-if="isComplete" />
+      <QueueEmptyState v-if="isComplete" />
 
       <!-- Message Display -->
-      <MessageCard
+      <QueueMessageCard
         v-else-if="currentMessage"
         :message="currentMessage"
         :is-transitioning="isTransitioning"
@@ -62,11 +62,11 @@ watch(currentMessage, (message) => {
       />
 
       <!-- Loading State -->
-      <MessageSkeleton v-else />
+      <QueueMessageSkeleton v-else />
     </main>
 
     <!-- Action Bar (only when there's a message) -->
-    <ActionBar
+    <QueueActionBar
       v-if="!isComplete && currentMessage"
       :suggestions="suggestions"
       :disabled="isTransitioning"

@@ -56,7 +56,7 @@ function formatFileSize(size: string): string {
       <div class="flex items-start justify-between gap-4 mb-4">
         <!-- Sender Info -->
         <div class="flex items-start gap-3">
-          <SenderAvatar :sender="message.sender" />
+          <QueueSenderAvatar :sender="message.sender" />
           <div class="min-w-0">
             <h2 class="text-lg font-semibold text-warm-900 leading-tight">
               {{ message.sender.name }}

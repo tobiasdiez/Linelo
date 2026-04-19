@@ -1,11 +1,6 @@
 <script setup lang="ts">
 import type { AISuggestion, EmailAction } from '~/types/email'
 
-defineProps<{
-  suggestions: AISuggestion[]
-  disabled: boolean
-}>()
-
 const emit = defineEmits<{
   action: [action: EmailAction]
   suggestion: [suggestion: AISuggestion]
