@@ -145,11 +145,11 @@ Linelo should not sound:
 ### Primary Colors
 
 - Dark slate (`#1C1F24`)
-- Off-white (`#F5F5F3`)
+- Off-white (`oklch(0.975 0.008 85)`)
 
 ### Accent
 
-- Muted green (`#6E8F7A`) for a playful touch
+- Muted green (`oklch(0.55 0.08 160)`) for a playful touch
 
 ### Typography
 
