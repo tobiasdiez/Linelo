@@ -73,15 +73,21 @@ Read more in the full newsletter...`,
 
 const mockSuggestions: Record<string, AISuggestion[]> = {
   '1': [
-    { id: 's1', action: 'reply', description: 'Reply — confirm availability', confidence: 0.85 },
-    { id: 's2', action: 'task', description: 'Add task — review by Friday', confidence: 0.72 },
+    { id: 's1', action: 'reply', description: 'Reply — confirm availability for Q3 planning', confidence: 0.85 },
+    { id: 's2', action: 'reply', description: 'Reply — request more details first', confidence: 0.68 },
+    { id: 's3', action: 'task', description: 'Add task — review document by Friday', confidence: 0.72 },
+    { id: 's4', action: 'handled', description: 'Mark handled — no response needed', confidence: 0.25 },
   ],
   '2': [
-    { id: 's3', action: 'reply', description: 'Reply — suggest a time', confidence: 0.91 },
-    { id: 's4', action: 'handled', description: 'Mark handled — already scheduled', confidence: 0.45 },
+    { id: 's5', action: 'reply', description: 'Reply — suggest tomorrow 3pm', confidence: 0.91 },
+    { id: 's6', action: 'reply', description: 'Reply — propose next week instead', confidence: 0.65 },
+    { id: 's7', action: 'handled', description: 'Mark handled — already scheduled', confidence: 0.45 },
+    { id: 's8', action: 'delegate', description: 'Delegate — forward to design team', confidence: 0.38 },
   ],
   '3': [
-    { id: 's5', action: 'handled', description: 'Mark handled — no action needed', confidence: 0.88 },
+    { id: 's9', action: 'handled', description: 'Mark handled — no action needed', confidence: 0.88 },
+    { id: 's10', action: 'task', description: 'Add task — read later this weekend', confidence: 0.42 },
+    { id: 's11', action: 'handled', description: 'Mark handled — unsubscribe from list', confidence: 0.35 },
   ],
 }
 

@@ -70,8 +70,7 @@ watch(currentMessage, (message) => {
       v-if="!isComplete && currentMessage"
       :suggestions="suggestions"
       :disabled="isTransitioning"
-      @action="handleAction"
-      @suggestion="handleSuggestion"
+      @action="handleSuggestion"
     />
   </div>
 </template>
