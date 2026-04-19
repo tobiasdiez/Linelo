@@ -30,27 +30,27 @@ The palette derives from the brand guidelines, emphasizing warmth and calm over 
 
 #### Primary Colors
 
-| Role | Color | Hex | Usage |
-|------|-------|-----|-------|
-| **Background** | Warm Off-White | `#F5F5F3` | Primary canvas, creates soft, paper-like warmth |
-| **Surface** | Pure White | `#FFFFFF` | Message card, elevated containers |
-| **Text Primary** | Dark Slate | `#1C1F24` | Headlines, body text, sender names |
-| **Text Secondary** | Slate Gray | `#64696F` | Timestamps, metadata, explanatory text |
+| Role               | Color          | Hex       | Usage                                           |
+| ------------------ | -------------- | --------- | ----------------------------------------------- |
+| **Background**     | Warm Off-White | `#F5F5F3` | Primary canvas, creates soft, paper-like warmth |
+| **Surface**        | Pure White     | `#FFFFFF` | Message card, elevated containers               |
+| **Text Primary**   | Dark Slate     | `#1C1F24` | Headlines, body text, sender names              |
+| **Text Secondary** | Slate Gray     | `#64696F` | Timestamps, metadata, explanatory text          |
 
 #### Accent Colors
 
-| Role | Color | Hex | Usage |
-|------|-------|-----|-------|
+| Role               | Color       | Hex       | Usage                                                       |
+| ------------------ | ----------- | --------- | ----------------------------------------------------------- |
 | **Action Primary** | Muted Green | `#6E8F7A` | Primary action buttons, success states, progress indicators |
-| **Action Hover** | Deep Green | `#5A7A66` | Hover states for primary actions |
-| **Subtle Border** | Light Gray | `#E5E5E3` | Card borders, dividers, subtle containment |
+| **Action Hover**   | Deep Green  | `#5A7A66` | Hover states for primary actions                            |
+| **Subtle Border**  | Light Gray  | `#E5E5E3` | Card borders, dividers, subtle containment                  |
 
 #### Semantic Colors (Used Sparingly)
 
-| Role | Color | Hex | Usage |
-|------|-------|-----|-------|
-| **Focus Ring** | Muted Green | `#6E8F7A` at 40% opacity | Keyboard focus indicators |
-| **Error** | Muted Coral | `#C27A6E` | Connection issues, send failures (rare) |
+| Role           | Color       | Hex                      | Usage                                   |
+| -------------- | ----------- | ------------------------ | --------------------------------------- |
+| **Focus Ring** | Muted Green | `#6E8F7A` at 40% opacity | Keyboard focus indicators               |
+| **Error**      | Muted Coral | `#C27A6E`                | Connection issues, send failures (rare) |
 
 ### Typography
 
@@ -63,14 +63,14 @@ Typography follows the brand's preference for clean, neutral sans-serif fonts th
 
 #### Type Scale
 
-| Element | Size | Weight | Line Height | Letter Spacing |
-|---------|------|--------|-------------|----------------|
-| **Sender Name** | 18px | 600 (Semibold) | 1.3 | -0.01em |
-| **Subject Line** | 16px | 500 (Medium) | 1.4 | 0 |
-| **Message Body** | 15px | 400 (Regular) | 1.6 | 0.01em |
-| **Metadata** | 13px | 400 (Regular) | 1.4 | 0.02em |
-| **Action Labels** | 14px | 500 (Medium) | 1.2 | 0.01em |
-| **Explanation Text** | 13px | 400 (Regular) | 1.5 | 0.01em |
+| Element              | Size | Weight         | Line Height | Letter Spacing |
+| -------------------- | ---- | -------------- | ----------- | -------------- |
+| **Sender Name**      | 18px | 600 (Semibold) | 1.3         | -0.01em        |
+| **Subject Line**     | 16px | 500 (Medium)   | 1.4         | 0              |
+| **Message Body**     | 15px | 400 (Regular)  | 1.6         | 0.01em         |
+| **Metadata**         | 13px | 400 (Regular)  | 1.4         | 0.02em         |
+| **Action Labels**    | 14px | 500 (Medium)   | 1.2         | 0.01em         |
+| **Explanation Text** | 13px | 400 (Regular)  | 1.5         | 0.01em         |
 
 #### Typography Rules
 
@@ -83,32 +83,32 @@ Typography follows the brand's preference for clean, neutral sans-serif fonts th
 
 Based on an 8px grid to create consistent rhythm:
 
-| Token | Value | Usage |
-|-------|-------|-------|
-| `space-xs` | 4px | Icon-to-text gaps, tight groupings |
-| `space-sm` | 8px | Related element spacing |
-| `space-md` | 16px | Section padding, card internal spacing |
-| `space-lg` | 24px | Major section separation |
-| `space-xl` | 32px | Screen-edge padding, breathing room |
-| `space-2xl` | 48px | Vertical rhythm between major zones |
+| Token       | Value | Usage                                  |
+| ----------- | ----- | -------------------------------------- |
+| `space-xs`  | 4px   | Icon-to-text gaps, tight groupings     |
+| `space-sm`  | 8px   | Related element spacing                |
+| `space-md`  | 16px  | Section padding, card internal spacing |
+| `space-lg`  | 24px  | Major section separation               |
+| `space-xl`  | 32px  | Screen-edge padding, breathing room    |
+| `space-2xl` | 48px  | Vertical rhythm between major zones    |
 
 ### Border Radius
 
-| Token | Value | Usage |
-|-------|-------|-------|
-| `radius-sm` | 6px | Buttons, badges |
-| `radius-md` | 12px | Cards, containers |
-| `radius-lg` | 16px | Modal overlays, sheets |
+| Token       | Value | Usage                  |
+| ----------- | ----- | ---------------------- |
+| `radius-sm` | 6px   | Buttons, badges        |
+| `radius-md` | 12px  | Cards, containers      |
+| `radius-lg` | 16px  | Modal overlays, sheets |
 
 ### Shadows
 
 Shadows are minimal and soft—never harsh or dramatic:
 
-| Token | Value | Usage |
-|-------|-------|-------|
-| `shadow-card` | `0 1px 3px rgba(28, 31, 36, 0.04), 0 4px 12px rgba(28, 31, 36, 0.03)` | Message card elevation |
-| `shadow-hover` | `0 2px 8px rgba(28, 31, 36, 0.06), 0 8px 24px rgba(28, 31, 36, 0.04)` | Hover lift on card |
-| `shadow-button` | `0 1px 2px rgba(28, 31, 36, 0.05)` | Subtle button depth |
+| Token           | Value                                                                 | Usage                  |
+| --------------- | --------------------------------------------------------------------- | ---------------------- |
+| `shadow-card`   | `0 1px 3px rgba(28, 31, 36, 0.04), 0 4px 12px rgba(28, 31, 36, 0.03)` | Message card elevation |
+| `shadow-hover`  | `0 2px 8px rgba(28, 31, 36, 0.06), 0 8px 24px rgba(28, 31, 36, 0.04)` | Hover lift on card     |
+| `shadow-button` | `0 1px 2px rgba(28, 31, 36, 0.05)`                                    | Subtle button depth    |
 
 ---
 
@@ -137,7 +137,7 @@ The queue screen is divided into three primary zones, organized vertically with 
 │                                                             │
 │  ┌─────────────────────────────────────────────────────┐   │
 │  │                  ACTION ZONE                         │   │
-│  │           (decisions and suggestions)                │   │
+│  │    (unified buttons with inline AI suggestions)      │   │
 │  └─────────────────────────────────────────────────────┘   │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
@@ -172,7 +172,6 @@ Provide orientation and access to secondary functions without competing for atte
 - **Not a count** — The PRD explicitly states not to show remaining message count
 - Instead, display qualitative progress signals:
   - "High-priority messages" (when processing urgent tier)
-  - "Working through your inbox" (neutral, mid-session)
   - "Low-priority tail" (when bulk/newsletters dominate)
   - Empty state when at inbox zero
 - Typography: 13px, secondary text color, lowercase or sentence case
@@ -264,7 +263,7 @@ When the message is part of a thread:
 
 - Show the most recent message fully
 - Earlier messages in thread are collapsed by default
-- Expandable via a subtle "Show 3 earlier messages" link (secondary text, no button styling)
+- Expandable via a subtle "Show earlier messages" link (secondary text, no button styling)
 - When expanded, earlier messages appear above in chronological order, with visual separation (horizontal rule or spacing)
 - Collapsed quoted text ("On Apr 14, John wrote...") is hidden by default but expandable
 
@@ -293,7 +292,7 @@ The PRD specifies that prioritization explanations are configurable (default off
 
 ### Purpose
 
-Present the four terminal actions and AI-suggested approaches clearly, enabling quick, confident decisions.
+Present the suggested approaches clearly, enabling quick, confident decisions.
 
 ### Layout
 
@@ -305,96 +304,77 @@ Present the four terminal actions and AI-suggested approaches clearly, enabling 
 
 ### Structure
 
-The action area has two tiers:
+A vertical stack of 3-5 action options. Each option is a full-width row describing a concrete action the user can take on the current message. The options are contextual — they change per message based on AI analysis.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                                                             │
 │  ┌─────────────────────────────────────────────────────┐   │
-│  │            AI SUGGESTIONS (2-3 options)              │   │
-│  │  ┌───────────────┐  ┌───────────────┐               │   │
-│  │  │ Reply — accept│  │ Mark handled  │               │   │
-│  │  │ the request   │  │ no action     │               │   │
-│  │  └───────────────┘  └───────────────┘               │   │
+│  │  ↩  Reply — accept the request                      │   │
 │  └─────────────────────────────────────────────────────┘   │
 │                                                             │
 │  ┌─────────────────────────────────────────────────────┐   │
-│  │              CORE ACTIONS (always visible)           │   │
-│  │                                                      │   │
-│  │  [Reply]   [Handled]   [Delegate]   [Add Task]      │   │
-│  │                                                      │   │
+│  │  ↩  Reply — decline politely                        │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │  ✓  Mark as handled — no action needed              │   │
 │  └─────────────────────────────────────────────────────┘   │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### Tier 1: AI Suggestions
+### Action Options
 
-- **Position:** Above the core action buttons
-- **Display:** 2–3 horizontal cards/chips (per PRD guidance)
-- **Purpose:** Pre-configured actions that combine intent + action (e.g., "Reply — accept the meeting")
+#### Content Model
 
-#### Suggestion Chip Design
+Each option combines an action type with a specific intent:
 
-- **Container:** Rounded rectangle, subtle border, white background, soft shadow
-- **Size:** Auto-width based on content, height ~44px
-- **Layout:** Icon (optional) + text label
-- **Typography:** 14px, medium weight
-- **Hover:** Slight lift (`shadow-hover`), border color shifts to muted green
-- **Click:** Immediate action (opens reply composer with pre-filled draft, marks as handled, etc.)
+- **Action type:** One of Reply, Mark as handled, Delegate, or Add Task — represented by an icon
+- **Intent description:** A short phrase describing what the action accomplishes for this message (e.g., "accept the request", "forward to Alex with context", "deadline Friday")
 
-#### Suggestion Content Examples
+The combined label reads naturally: "Reply — accept the request", "Mark as handled — no action needed", "Add Task — deadline Friday".
 
-- "Reply — accept the request"
-- "Reply — decline politely"
-- "Mark as handled — no action needed"
-- "Add to tasks — deadline mentioned"
-- "Delegate — forward to [Name]"
+#### Examples by Action Type
 
-#### When Suggestions Aren't Shown
+| Icon          | Option Label                         | Keyboard |
+| ------------- | ------------------------------------ | -------- |
+| Arrow-reply   | "Reply — accept the request"         | `1`      |
+| Arrow-reply   | "Reply — decline politely"           | `2`      |
+| Check-circle  | "Mark as handled — no action needed" | `3`      |
+| Forward-arrow | "Delegate — forward to Alex"         | `1`      |
+| Plus-square   | "Add Task — deadline Friday"         | `2`      |
 
-For some messages, the AI may not have confident suggestions. In this case:
-- The suggestion tier is simply absent (not shown as empty)
-- The core action buttons shift upward to fill the space
-- No error state or "no suggestions" message—silence is intentional
+#### Layout
 
-### Tier 2: Core Actions
+- Vertical stack, full width of the action zone (max-width aligned with message card, 680px)
+- Gap: `space-sm` (8px) between options
+- 3-5 options per message
+- The top option is the AI's highest-confidence recommendation and receives primary emphasis
 
-Four terminal actions are always visible, representing the complete decision space.
+#### Option Row Design
 
-#### Button Layout
+- **Container:** Full-width rounded rectangle
+- **Height:** ~48px
+- **Layout:** Icon (left) + label text (left-aligned next to icon) + keyboard shortcut badge (right)
+- **Typography:** 14px, medium weight for the label
+- **Icon:** 18px, matching action type (reply, check, forward, plus)
+- **Border-radius:** `radius-sm` (6px)
+- **Padding:** 12px 16px
 
-- Horizontal row, evenly spaced
-- Center-aligned within the action zone
-- Gap: `space-md` (16px) between buttons
-
-#### Button Design
-
-Each button combines an icon with a short label:
-
-| Action | Icon | Label | Keyboard Shortcut |
-|--------|------|-------|-------------------|
-| Reply | Arrow-reply icon | "Reply" | `R` |
-| Handled | Check-circle icon | "Handled" | `H` |
-| Delegate | Forward-arrow icon | "Delegate" | `D` |
-| Add Task | Plus-square icon | "Add Task" | `T` |
-
-#### Button Styling
+#### Option Styling
 
 - **Default State:**
-  - Background: Transparent or very light gray
+  - Background: White
   - Border: 1px solid `#E5E5E3`
-  - Text/Icon: Secondary text color
-  - Border-radius: `radius-sm` (6px)
-  - Padding: 12px 20px
+  - Text/Icon: Dark slate (`#1C1F24`)
   - Shadow: `shadow-button`
 
 - **Hover State:**
   - Background: White
   - Border: 1px solid muted green (`#6E8F7A`)
-  - Text/Icon: Dark slate
   - Shadow: `shadow-hover`
-  - Subtle scale transform (1.02x)
+  - Subtle scale transform (1.01x)
 
 - **Focus State (Keyboard):**
   - Focus ring: 2px muted green at 40% opacity, 2px offset
@@ -404,14 +384,25 @@ Each button combines an icon with a short label:
   - Background: Muted green at 10% opacity
   - Scale: 0.98x (slight press effect)
 
-- **Primary Emphasis (Optional):**
-  - If one action is strongly suggested by AI (high confidence), that core button could have a subtle accent indicator (small dot or slightly stronger border) to guide attention without being pushy
+- **Primary Emphasis (top option / highest confidence):**
+  - Border: 1px solid muted green (`#6E8F7A`)
+  - Background: Muted green at 5% opacity
+  - Slightly bolder presence to gently guide attention without being pushy
 
 #### Keyboard Shortcuts
 
-- Display shortcut letters as subtle badges within or below each button (e.g., small "R" indicator)
+- Options are numbered `1`, `2`, `3` from top to bottom
+- Shortcut numbers displayed as subtle badges on the right edge of each row
 - Typography: 11px, secondary text color, monospace
-- Position: Below the button label or in the bottom-right corner of the button
+- Pressing the number key immediately triggers that option
+
+#### When AI Has Low Confidence
+
+For some messages, the AI may not produce confident suggestions. In this case:
+
+- Fall back to generic options based on message signals (e.g., "Reply", "Mark as handled", "Add Task")
+- Generic options omit the intent description and show only the action type label
+- The layout remains the same vertical stack — no visual disruption
 
 ---
 
@@ -429,7 +420,7 @@ When all messages are processed:
 │                                                             │
 │                   All caught up.                            │
 │                                                             │
-│             You've finished your inbox.                     │
+│             You've finished your messages.                  │
 │                                                             │
 │                                                             │
 │                     [Close Linelo]                          │
@@ -442,7 +433,7 @@ When all messages are processed:
 - Centered vertically in the viewport
 - **Icon:** Simple checkmark, muted green, 48px, perhaps with a subtle celebratory animation (one-time, gentle pulse or fade-in)
 - **Headline:** "All caught up." — 24px, semibold, dark slate
-- **Subtext:** "You've finished your inbox." — 15px, secondary text color
+- **Subtext:** "You've finished your messages." — 15px, secondary text color
 - **Action:** Optional "Close Linelo" button (outlined, secondary styling) to encourage the user to leave
 - **No confetti, no streaks, no gamification** — The PRD explicitly prohibits guilt or engagement mechanics. The celebration is quiet satisfaction.
 
@@ -522,20 +513,19 @@ All transitions should feel smooth and intentional, never jarring.
 
 Full keyboard support is required per the PRD:
 
-| Key | Action |
-|-----|--------|
-| `R` | Focus/activate Reply |
-| `H` | Activate "Handled" immediately |
-| `D` | Focus/activate Delegate |
-| `T` | Focus/activate Add Task |
-| `Tab` | Navigate between actionable elements |
-| `Enter` | Confirm focused action |
-| `Escape` | Close any open modal/composer |
-| `↑` / `↓` | Scroll message content |
+| Key       | Action                                    |
+| --------- | ----------------------------------------- |
+| `1`       | Activate first (top) action option        |
+| `2`       | Activate second action option             |
+| `3`       | Activate third action option (if present) |
+| `↑` / `↓` | Navigate between action options           |
+| `Tab`     | Navigate between actionable elements      |
+| `Enter`   | Confirm focused action                    |
+| `Escape`  | Close any open modal/composer             |
 
 #### Keyboard Shortcut Visibility
 
-- Shortcuts appear as subtle indicators on buttons
+- Number shortcuts appear as subtle badges on the right edge of each option row
 - On first session, a dismissible tooltip explains keyboard shortcuts
 - Shortcuts remain visible at all times (not hidden until discovered)
 
@@ -553,8 +543,7 @@ Full keyboard support is required per the PRD:
 ### Tablet (768px – 1024px)
 
 - Message card expands to fill more horizontal space (max 90% viewport)
-- Action buttons may wrap to 2x2 grid if space is tight
-- AI suggestions stack vertically if needed
+- Action options remain a vertical stack, full width
 
 ### Mobile (< 768px)
 
@@ -562,8 +551,7 @@ Full keyboard support is required per the PRD:
 - **Message card:** Full-width with minimal margin (16px sides)
 - **Action zone:**
   - Fixed to bottom of screen (sticky)
-  - AI suggestions become a horizontal scroll if more than 2
-  - Core action buttons displayed as a 2x2 grid or remain in a row with smaller padding
+  - Action options remain a vertical stack, full width with reduced padding
   - Safe area padding at bottom for notched devices
 - **Keyboard shortcuts:** Hidden on touch devices (no physical keyboard)
 - **Gestures:** Swipe actions become more prominent as an alternative to buttons
@@ -592,7 +580,7 @@ Full keyboard support is required per the PRD:
 
 - Focus moves to message card when new message appears
 - Clear focus indicators on all interactive elements
-- Logical tab order: Message content → AI suggestions → Core actions
+- Logical tab order: Message content → Action options (top to bottom)
 - Skip link to jump directly to actions
 
 ### Reduced Motion
@@ -628,36 +616,23 @@ States:
 - scrollable (when content exceeds viewport)
 ```
 
-### Action Button Component
+### Action Option Component
 
 ```
 Props:
 - action: 'reply' | 'handled' | 'delegate' | 'task'
-- label: string
+- label: string (full label including intent, e.g. "Reply — accept the request")
 - icon: IconComponent
-- shortcut: string
+- shortcut: string (number key)
 - onAction: () => void
-- emphasized?: boolean
+- emphasized?: boolean (true for highest-confidence option)
 
 States:
 - default
 - hover
 - focus
 - active/pressed
-- loading (for async actions)
-```
-
-### Suggestion Chip Component
-
-```
-Props:
-- suggestion: { action: ActionType, description: string, confidence: number }
-- onSelect: () => void
-
-States:
-- default
-- hover
-- selected (brief flash on click)
+- loading (for async actions like sending a reply)
 ```
 
 ### Progress Indicator Component
@@ -679,6 +654,7 @@ Renders:
 ### Tone Alignment
 
 Per brand guidelines, copy should be:
+
 - Calm and grounded
 - Short and declarative
 - Specific about outcomes
@@ -686,23 +662,23 @@ Per brand guidelines, copy should be:
 
 ### Examples
 
-| Context | Copy |
-|---------|------|
-| Progress (early) | "Working through your inbox" |
-| Progress (high-priority done) | "High-priority messages handled" |
-| Progress (low-priority tail) | "Low-priority tail" |
-| Inbox zero | "All caught up." |
-| Action: Reply | "Reply" |
-| Action: Handled | "Handled" |
-| Action: Delegate | "Delegate" |
-| Action: Add Task | "Add Task" |
-| Explanation example | "From a frequent contact" |
-| Explanation example | "Contains deadline language" |
-| Explanation example | "Newsletter, low engagement" |
-| Error: Connection | "Connection lost. Actions will sync when reconnected." |
-| Error: Action failed | "Couldn't send. Tap to retry." |
-| Loading | "Loading next message..." |
-| Task confirmation | "Task added" |
+| Context                       | Copy                                                   |
+| ----------------------------- | ------------------------------------------------------ |
+| Progress (early)              | "Working through your inbox"                           |
+| Progress (high-priority done) | "High-priority messages handled"                       |
+| Progress (low-priority tail)  | "Low-priority tail"                                    |
+| Inbox zero                    | "All caught up."                                       |
+| Action: Reply                 | "Reply"                                                |
+| Action: Handled               | "Handled"                                              |
+| Action: Delegate              | "Delegate"                                             |
+| Action: Add Task              | "Add Task"                                             |
+| Explanation example           | "From a frequent contact"                              |
+| Explanation example           | "Contains deadline language"                           |
+| Explanation example           | "Newsletter, low engagement"                           |
+| Error: Connection             | "Connection lost. Actions will sync when reconnected." |
+| Error: Action failed          | "Couldn't send. Tap to retry."                         |
+| Loading                       | "Loading next message..."                              |
+| Task confirmation             | "Task added"                                           |
 
 ### Copy to Avoid
 
@@ -725,17 +701,17 @@ Per brand guidelines, copy should be:
 
 ### Defined Animations
 
-| Animation | Duration | Easing | Description |
-|-----------|----------|--------|-------------|
-| Message enter | 250ms | ease-out-cubic | Slide from right + fade in |
-| Message exit | 200ms | ease-in-cubic | Slide to left + fade out |
-| Button hover | 150ms | ease-out | Scale 1.02, shadow increase |
-| Button press | 100ms | ease-out | Scale 0.98 |
-| Card hover | 200ms | ease-out | Shadow increase |
-| Toast enter | 200ms | ease-out | Slide up + fade in |
-| Toast exit | 150ms | ease-in | Fade out |
-| Skeleton pulse | 1500ms | ease-in-out | Opacity 0.5 → 1 → 0.5 (loop) |
-| Completion check | 400ms | spring | Scale 0 → 1.1 → 1 with subtle bounce |
+| Animation        | Duration | Easing         | Description                          |
+| ---------------- | -------- | -------------- | ------------------------------------ |
+| Message enter    | 250ms    | ease-out-cubic | Slide from right + fade in           |
+| Message exit     | 200ms    | ease-in-cubic  | Slide to left + fade out             |
+| Button hover     | 150ms    | ease-out       | Scale 1.02, shadow increase          |
+| Button press     | 100ms    | ease-out       | Scale 0.98                           |
+| Card hover       | 200ms    | ease-out       | Shadow increase                      |
+| Toast enter      | 200ms    | ease-out       | Slide up + fade in                   |
+| Toast exit       | 150ms    | ease-in        | Fade out                             |
+| Skeleton pulse   | 1500ms   | ease-in-out    | Opacity 0.5 → 1 → 0.5 (loop)         |
+| Completion check | 400ms    | spring         | Scale 0 → 1.1 → 1 with subtle bounce |
 
 ---
 
@@ -746,6 +722,7 @@ This design specification defines a queue screen that embodies Linelo's core pro
 The visual language—warm off-white backgrounds, a muted green accent, generous whitespace, and restrained typography—reinforces the brand's positioning as counter-addictive software. Every element earns its place by supporting the singular goal: help the user make a decision and move forward.
 
 The design intentionally leaves out:
+
 - Inbox lists or message counts
 - Skip or defer options
 - Gamification or achievement mechanics
