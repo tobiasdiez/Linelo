@@ -56,7 +56,7 @@ jobs:
         run: vp install
 
       - name: Build
-        run: vp build
+        run: vp run build
 
       - name: Run tests
         run: vp test --coverage
