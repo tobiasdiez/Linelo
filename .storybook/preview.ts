@@ -1,3 +1,5 @@
-export default {
+const config = {
   tags: ['autodocs'],
 }
+
+export default config
