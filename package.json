@@ -13,8 +13,10 @@
     "dev": "nuxt dev",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
-    "postinstall": "nuxt prepare"
-  },
+    "postinstall": "nuxt prepare",
+    "storybook": "storybook dev -p 6006",
+    "storybook:build": "storybook build"
+    },
   "dependencies": {
     "@nuxt/ui": "4.6.1",
     "nuxt": "4.4.2",
@@ -23,8 +25,12 @@
     "vue-router": "5.0.4"
   },
   "devDependencies": {
-    "@nuxt/eslint-plugin": "^1.15.2",
+    "@chromatic-com/storybook": "5.1.2",
+    "@nuxt/eslint-plugin": "1.15.2",
+    "@nuxtjs/storybook": "npm:@nuxtjs/storybook@nightly",
     "rolldown": "1.0.0-rc.13",
+    "storybook": "10.3.6",
+    "storybook-vue-addon": "0.6.3",
     "vite-plus": "catalog:"
   },
   "engines": {

@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+
+  pull_request:
+
+jobs:
+  lint:
+    name: Lint
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Setup VoidZero
+        uses: voidzero-dev/setup-vp@v1
+        with:
+            node-version: '24'
+            cache: true
+
+      - name: Install dependencies
+        run: vp install
+
+      - name: Run linter
+        run: vp check
+
+  test:
+    name: Build & Test
+
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Setup VoidZero
+        uses: voidzero-dev/setup-vp@v1
+        with:
+            node-version: '24'
+            cache: true
+
+      - name: Install dependencies
+        run: vp install
+
+      - name: Build
+        run: vp build
+
+      - name: Run tests
+        run: vp test --coverage
+
+      - name: Build Storybook
+        if: always()
+        run: vp run storybook:build
+
+      - name: Publish and test Storybook
+        if: always()
+        uses: chromaui/action@eea1606238fd97a70b5af723d103953d1f40967b # v15.3.1
+        with:
+          projectToken: 'chpt_12a8831ee2a9ae4'
+          # Don't wait until Chroma verified the build (for this we have the Github check)
+          exitOnceUploaded: true
+          storybookBuildDir: storybook-static
+          debug: true
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@75cd11691c0faa626561e295848008c8a7dddffe # v5.5.4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
