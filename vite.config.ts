@@ -14,9 +14,11 @@ export default defineConfig({
       style: 'error',
       suspicious: 'error',
     },
-    config: [
+    jsPlugins: ['@nuxt/eslint-plugin'],
+    options: { typeAware: true, typeCheck: true },
+    overrides: [
       {
-        files: '**/*.vue',
+        files: ['**/*.vue'],
         rules: {
           'unicorn/filename-case': [
             'error',
@@ -27,8 +29,6 @@ export default defineConfig({
         },
       },
     ],
-    jsPlugins: ['@nuxt/eslint-plugin'],
-    options: { typeAware: true, typeCheck: true },
     plugins: ['eslint', 'import', 'unicorn', 'typescript', 'oxc', 'vue', 'vitest'],
   },
 })
