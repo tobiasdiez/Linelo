@@ -16,7 +16,7 @@
     "postinstall": "nuxt prepare",
     "storybook": "storybook dev -p 6006",
     "storybook:build": "storybook build"
-    },
+  },
   "dependencies": {
     "@nuxt/ui": "4.6.1",
     "nuxt": "4.4.2",

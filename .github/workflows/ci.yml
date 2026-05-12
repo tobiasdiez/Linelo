@@ -22,8 +22,8 @@ jobs:
       - name: Setup VoidZero
         uses: voidzero-dev/setup-vp@v1
         with:
-            node-version: '24'
-            cache: true
+          node-version: '24'
+          cache: true
 
       - name: Install dependencies
         run: vp install
@@ -49,8 +49,8 @@ jobs:
       - name: Setup VoidZero
         uses: voidzero-dev/setup-vp@v1
         with:
-            node-version: '24'
-            cache: true
+          node-version: '24'
+          cache: true
 
       - name: Install dependencies
         run: vp install
