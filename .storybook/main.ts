@@ -11,6 +11,6 @@ const config: StorybookConfig = {
     options: {},
   },
   // Need to specify stories as workaround for https://github.com/storybookjs/storybook/issues/20761
-  stories: ['../components/*.stories.vue'],
+  stories: ['../app/components/*.stories.vue'],
 }
 export default config
