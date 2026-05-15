@@ -28,11 +28,11 @@
   "devDependencies": {
     "@chromatic-com/storybook": "5.2.1",
     "@nuxt/eslint-plugin": "1.15.2",
-    "@nuxtjs/storybook": "npm:@nuxtjs/storybook@nightly",
+    "@nuxtjs/storybook": "https://pkg.pr.new/@nuxtjs/storybook@2a17f94",
     "rolldown": "1.0.0-rc.13",
     "storybook": "10.4.0",
     "storybook-vue-addon": "0.7.1",
-    "vite-plus": "catalog:"
+    "vite-plus": "0.1.21"
   },
   "engines": {
     "node": "24"
