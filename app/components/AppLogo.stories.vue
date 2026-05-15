@@ -3,10 +3,7 @@ import AppLogo from './AppLogo.vue'
 </script>
 
 <template>
-  <Stories
-    title="App Logo"
-    :component="AppLogo"
-  >
+  <Stories title="App Logo" :component="AppLogo">
     <Story title="Standard">
       <AppLogo />
     </Story>
