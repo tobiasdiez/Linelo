@@ -25,3 +25,6 @@ logs
 
 # Storybook build files
 storybook-static/
+
+# Test coverage
+coverage/
