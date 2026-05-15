@@ -26,12 +26,12 @@
     "vue-router": "5.0.4"
   },
   "devDependencies": {
-    "@chromatic-com/storybook": "5.1.2",
+    "@chromatic-com/storybook": "5.2.1",
     "@nuxt/eslint-plugin": "1.15.2",
     "@nuxtjs/storybook": "npm:@nuxtjs/storybook@nightly",
     "rolldown": "1.0.0-rc.13",
-    "storybook": "10.3.6",
-    "storybook-vue-addon": "0.6.3",
+    "storybook": "10.4.0",
+    "storybook-vue-addon": "0.7.1",
     "vite-plus": "catalog:"
   },
   "engines": {
