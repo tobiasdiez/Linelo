@@ -20,7 +20,7 @@ jobs:
           fetch-depth: 0
 
       - name: Install dependencies
-        uses: voidzero-dev/setup-vp@v1
+        uses: voidzero-dev/setup-vp@ca1c46663915d6c1042ae23bd39ab85718bfb0fa # v1.10.0
         with:
           node-version: '24'
           cache: true
@@ -44,7 +44,7 @@ jobs:
           fetch-depth: 0
 
       - name: Install dependencies
-        uses: voidzero-dev/setup-vp@v1
+        uses: voidzero-dev/setup-vp@ca1c46663915d6c1042ae23bd39ab85718bfb0fa # v1.10.0
         with:
           node-version: '24'
           cache: true
