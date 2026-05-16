@@ -1,2 +1,76 @@
 @import 'tailwindcss';
 @import '@nuxt/ui';
+
+@theme static {
+  /* Typography */
+  --font-sans: 'Manrope', 'Avenir Next', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'SF Mono', 'Fira Code', ui-monospace, monospace;
+
+  /* Colors */
+  --color-*: initial;
+
+  /* https://uihue.com?c=b2tsY2goNDcuOTQlIDAuMDc4IDE2MS4wOCk= */
+  --color-primary-50: oklch(97.9% 0.021 160.28);
+  --color-primary-100: oklch(95.592% 0.04988 157.22);
+  --color-primary-200: oklch(91.685% 0.08875 158.32);
+  --color-primary-300: oklch(86.277% 0.13663 159.15);
+  --color-primary-400: oklch(78.87% 0.1685 157.39);
+  --color-primary-500: oklch(72.563% 0.15938 156.65);
+  --color-primary-600: oklch(63.155% 0.13225 157.39);
+  --color-primary-700: oklch(54.948% 0.10313 159.78);
+  --color-primary-800: oklch(47.94% 0.078 161.08);
+  --color-primary-900: oklch(40.17% 0.0685 163.11);
+  --color-primary-950: oklch(26.2% 0.051 166.72);
+
+  /* https://uihue.com?c=b2tsY2goNzQuNDMlIDAuMTQ0MiA4NS41NCk= */
+  --color-secondary-50: oklch(98.7% 0.026 102.21);
+  --color-secondary-100: oklch(96.286% 0.06304 98.878);
+  --color-secondary-200: oklch(92.472% 0.11308 95.543);
+  --color-secondary-300: oklch(87.458% 0.15812 92.209);
+  --color-secondary-400: oklch(81.144% 0.16716 88.874);
+  --color-secondary-500: oklch(74.43% 0.1442 85.54);
+  --color-secondary-600: oklch(64.044% 0.13016 75.327);
+  --color-secondary-700: oklch(52.358% 0.11112 65.935);
+  --color-secondary-800: oklch(45.572% 0.09808 61.4);
+  --color-secondary-900: oklch(41.086% 0.08704 57.201);
+  --color-secondary-950: oklch(28.6% 0.066 53.306);
+
+  /* https://tailwindcolor.com/neutral */
+  --color-neutral-50: oklch(0.985 0 0);
+  --color-neutral-100: oklch(0.97 0 0);
+  --color-neutral-200: oklch(0.922 0 0);
+  --color-neutral-300: oklch(0.87 0 0);
+  --color-neutral-400: oklch(0.708 0 0);
+  --color-neutral-500: oklch(0.556 0 0);
+  --color-neutral-600: oklch(0.439 0 0);
+  --color-neutral-700: oklch(0.371 0 0);
+  --color-neutral-800: oklch(0.269 0 0);
+  --color-neutral-900: oklch(0.205 0 0);
+  --color-neutral-950: oklch(0.145 0 0);
+
+  /* https://tailwindcolor.com/amber */
+  --color-amber-50: oklch(0.987 0.022 95.277);
+  --color-amber-100: oklch(0.962 0.059 95.617);
+  --color-amber-200: oklch(0.924 0.12 95.746);
+  --color-amber-300: oklch(0.879 0.169 91.605);
+  --color-amber-400: oklch(0.828 0.189 84.429);
+  --color-amber-500: oklch(0.769 0.188 70.08);
+  --color-amber-600: oklch(0.666 0.179 58.318);
+  --color-amber-700: oklch(0.555 0.163 48.998);
+  --color-amber-800: oklch(0.473 0.137 46.201);
+  --color-amber-900: oklch(0.414 0.112 45.904);
+  --color-amber-950: oklch(0.279 0.077 45.635);
+
+  /* https://tailwindcolor.com/red */
+  --color-red-50: oklch(0.971 0.013 17.38);
+  --color-red-100: oklch(0.936 0.032 17.717);
+  --color-red-200: oklch(0.885 0.062 18.334);
+  --color-red-300: oklch(0.808 0.114 19.571);
+  --color-red-400: oklch(0.704 0.191 22.216);
+  --color-red-500: oklch(0.637 0.237 25.331);
+  --color-red-600: oklch(0.577 0.245 27.325);
+  --color-red-700: oklch(0.505 0.213 27.518);
+  --color-red-800: oklch(0.444 0.177 26.899);
+  --color-red-900: oklch(0.396 0.141 25.723);
+  --color-red-950: oklch(0.258 0.092 26.042);
+}
