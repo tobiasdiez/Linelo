@@ -2,7 +2,6 @@ import { defineConfig } from 'vite-plus'
 import { defineVitestProject } from '@nuxt/test-utils/config'
 import { playwright } from 'vite-plus/test/browser-playwright'
 
-// @ts-expect-error: dirname is provided
 const rootDir = import.meta.dirname
 
 export default defineConfig({
@@ -40,6 +39,31 @@ export default defineConfig({
           onlyFunctionsWithExpectInLoop: true,
         },
       ],
+      // Allow export statements everywhere (handy for eg nuxt modules)
+      'import/exports-last': 'off',
+      // Enforce function declarations
+      'eslint/func-style': ['error', 'declaration'],
+      // Enforce minimum identifier length of 2, with exceptions for common short variables like i, j, and _ (often used for unused variables)
+      'eslint/id-length': [
+        'error',
+        {
+          min: 2,
+          exceptions: ['i', 'j', '_'],
+        },
+      ],
+      // Don't check max statements per function
+      'eslint/max-statements': 'off',
+      // Allow continue
+      'eslint/no-continue': 'off',
+      // Allow ternary expressions
+      'eslint/no-ternary': 'off',
+      // Allow only certain magic numbers
+      'eslint/no-magic-numbers': [
+        'error',
+        {
+          ignore: [-1, 0, 1, 2],
+        },
+      ],
     },
     jsPlugins: ['@nuxt/eslint-plugin'],
     options: { typeAware: true, typeCheck: true },
@@ -53,6 +77,12 @@ export default defineConfig({
               case: 'pascalCase',
             },
           ],
+        },
+      },
+      {
+        files: ['modules/**/*.ts'],
+        rules: {
+          'import/no-nodejs-modules': 'off',
         },
       },
     ],
