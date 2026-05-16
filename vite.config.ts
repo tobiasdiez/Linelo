@@ -2,6 +2,7 @@ import { defineConfig } from 'vite-plus'
 import { defineVitestProject } from '@nuxt/test-utils/config'
 import { playwright } from 'vite-plus/test/browser-playwright'
 
+// @ts-expect-error: dirname is provided
 const rootDir = import.meta.dirname
 
 export default defineConfig({
@@ -17,6 +18,28 @@ export default defineConfig({
       perf: 'error',
       style: 'error',
       suspicious: 'error',
+    },
+    rules: {
+      // Disable sort-keys as this is often undesired
+      'eslint/sort-keys': 'off',
+      // False-positives for imports from vite-plus/test. TODO: Reactivate this rule
+      'vitest/prefer-importing-vitest-globals': 'off',
+      // Verify correct test filename pattern
+      'vitest/consistent-test-filename': [
+        'error',
+        {
+          pattern: '.*\\.spec\\.ts$',
+        },
+      ],
+      // Restrict prefer-expect-assertions as it is requires to much boilerplate otherwise
+      'vitest/prefer-expect-assertions': [
+        'error',
+        {
+          onlyFunctionsWithAsyncKeyword: true,
+          onlyFunctionsWithExpectInCallback: true,
+          onlyFunctionsWithExpectInLoop: true,
+        },
+      ],
     },
     jsPlugins: ['@nuxt/eslint-plugin'],
     options: { typeAware: true, typeCheck: true },
@@ -48,15 +71,16 @@ export default defineConfig({
         },
         test: {
           name: 'unit',
-          include: ['test/unit/**/*.{test,spec}.ts'],
+          include: ['test/unit/**/*.spec.ts'],
           environment: 'node',
         },
       },
+      // @ts-expect-error: type error upstream
       () =>
         defineVitestProject({
           test: {
             name: 'nuxt',
-            include: ['test/nuxt/**/*.{test,spec}.ts'],
+            include: ['test/nuxt/**/*.spec.ts'],
             environment: 'nuxt',
             environmentOptions: {
               nuxt: {
@@ -69,15 +93,12 @@ export default defineConfig({
                     payloadExtraction: false,
                     viteEnvironmentApi: false,
                   },
-                  pwa: {
-                    pwaAssets: { disabled: true },
-                  },
-                  ogImage: { enabled: false },
                 },
               },
             },
             browser: {
               enabled: true,
+              // @ts-expect-error: type error upstream
               provider: playwright(),
               instances: [{ browser: 'chromium', headless: true }],
             },
