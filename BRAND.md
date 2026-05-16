@@ -144,12 +144,12 @@ Linelo should not sound:
 
 ### Primary Colors
 
-- Dark slate (`#1C1F24`)
-- Off-white (`#F5F5F3`)
+- Muted green (`oklch(0.4794 0.078 161.08)`, `#2f6b4f`)
+- Gold (`oklch(0.7443 0.1442 85.54)`, `#d5a422`)
+- Off-white (`oklch(0.9605 0.0108 95.16)`, `#f4f2ea`)
+- Dark slate (`oklch(0.2337 0.015 157.59)`, `#18201b`)
 
-### Accent
-
-- Muted green (`#6E8F7A`) for a playful touch
+(https://coolors.co/2f6b4f-d5a422-f4f2ea-18201b)
 
 ### Typography
 
