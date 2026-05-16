@@ -1,10 +1,7 @@
 <script setup lang="ts">
 const DEFAULT_LOGO_SIZE = 96
 
-const {
-  alt = 'Linelo',
-  size = DEFAULT_LOGO_SIZE,
-} = defineProps<{
+const { alt = 'Linelo', size = DEFAULT_LOGO_SIZE } = defineProps<{
   alt?: string
   size?: number | string
 }>()
@@ -16,7 +13,7 @@ const {
     :alt="alt"
     :style="{ width: typeof size === 'number' ? `${size}px` : size }"
     class="app-logo"
-  >
+  />
 </template>
 
 <style scoped>
