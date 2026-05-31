@@ -4,10 +4,13 @@
 @theme static {
   /* Typography */
   --font-sans: 'Manrope', 'Avenir Next', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  --font-display: 'Manrope', 'Avenir Next', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
   --font-mono: 'SF Mono', 'Fira Code', ui-monospace, monospace;
 
   /* Colors */
   --color-*: initial;
+  --color-white: #ffffff;
+  --color-black: #000000;
 
   /* https://uihue.com?c=b2tsY2goNDcuOTQlIDAuMDc4IDE2MS4wOCk= */
   --color-primary-50: oklch(97.9% 0.021 160.28);
@@ -21,6 +24,7 @@
   --color-primary-800: oklch(47.94% 0.078 161.08);
   --color-primary-900: oklch(40.17% 0.0685 163.11);
   --color-primary-950: oklch(26.2% 0.051 166.72);
+  --color-primary: var(--color-primary-800);
 
   /* https://uihue.com?c=b2tsY2goNzQuNDMlIDAuMTQ0MiA4NS41NCk= */
   --color-secondary-50: oklch(98.7% 0.026 102.21);
@@ -34,19 +38,23 @@
   --color-secondary-800: oklch(45.572% 0.09808 61.4);
   --color-secondary-900: oklch(41.086% 0.08704 57.201);
   --color-secondary-950: oklch(28.6% 0.066 53.306);
+  --color-secondary: var(--color-secondary-500);
 
-  /* https://tailwindcolor.com/neutral */
-  --color-neutral-50: oklch(0.985 0 0);
-  --color-neutral-100: oklch(0.97 0 0);
-  --color-neutral-200: oklch(0.922 0 0);
-  --color-neutral-300: oklch(0.87 0 0);
-  --color-neutral-400: oklch(0.708 0 0);
-  --color-neutral-500: oklch(0.556 0 0);
-  --color-neutral-600: oklch(0.439 0 0);
-  --color-neutral-700: oklch(0.371 0 0);
-  --color-neutral-800: oklch(0.269 0 0);
-  --color-neutral-900: oklch(0.205 0 0);
-  --color-neutral-950: oklch(0.145 0 0);
+  /* https://uihue.com?c=b2tsY2goMjMuMzclIDAuMDE1IDE1Ny41OSk= */
+  --color-neutral-50: oklch(98.5% 0 157.59);
+  --color-neutral-100: oklch(97.319% 0.00167 157.59);
+  --color-neutral-200: oklch(92.838% 0.00333 157.59);
+  --color-neutral-300: oklch(87.957% 0.005 157.59);
+  --color-neutral-400: oklch(72.076% 0.00667 157.59);
+  --color-neutral-500: oklch(57.194% 0.00833 157.59);
+  --color-neutral-600: oklch(45.813% 0.01 157.59);
+  --color-neutral-700: oklch(39.332% 0.01167 157.59);
+  --color-neutral-800: oklch(29.451% 0.01333 157.59);
+  --color-neutral-900: oklch(23.37% 0.015 157.59);
+  --color-neutral-950: oklch(14.5% 0 157.59);
+  --color-neutral: var(--color-neutral-500);
+
+  --color-off-white: oklch(0.9605 0.0108 95.16);
 
   /* https://tailwindcolor.com/amber */
   --color-amber-50: oklch(0.987 0.022 95.277);
@@ -60,6 +68,7 @@
   --color-amber-800: oklch(0.473 0.137 46.201);
   --color-amber-900: oklch(0.414 0.112 45.904);
   --color-amber-950: oklch(0.279 0.077 45.635);
+  --color-amber: var(--color-amber-500);
 
   /* https://tailwindcolor.com/red */
   --color-red-50: oklch(0.971 0.013 17.38);
@@ -73,4 +82,106 @@
   --color-red-800: oklch(0.444 0.177 26.899);
   --color-red-900: oklch(0.396 0.141 25.723);
   --color-red-950: oklch(0.258 0.092 26.042);
+  --color-red: var(--color-red-500);
+
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.125rem;
+  --text-sm: 0.9375rem;
+  --text-sm--line-height: 1.375rem;
+  --text-base: 1rem;
+  --text-base--line-height: 1.6rem;
+  --text-lg: 1.125rem;
+  --text-lg--line-height: 1.7rem;
+  --text-xl: 1.25rem;
+  --text-xl--line-height: 1.8rem;
+  --text-2xl: 1.5rem;
+  --text-2xl--line-height: 2rem;
+  --text-3xl: 1.875rem;
+  --text-3xl--line-height: 2.25rem;
+  --text-4xl: 2.375rem;
+  --text-4xl--line-height: 1.05;
+  --text-5xl: 3.25rem;
+  --text-5xl--line-height: 1;
+
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --tracking-tight: -0.03em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.02em;
+
+  --leading-tight: 1.2;
+  --leading-snug: 1.35;
+  --leading-normal: 1.6;
+  --leading-relaxed: 1.75;
+
+  --radius-xs: 0.25rem;
+  --radius-sm: 0.375rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 0.875rem;
+  --radius-xl: 1.125rem;
+  --radius-2xl: 1.5rem;
+  --radius-3xl: 2rem;
+
+  --shadow-2xs: 0 1px 0 rgb(24 32 27 / 0.04);
+  --shadow-xs: 0 1px 2px rgb(24 32 27 / 0.06);
+  --shadow-sm: 0 10px 24px rgb(24 32 27 / 0.08);
+  --shadow-md: 0 18px 40px rgb(24 32 27 / 0.12);
+  --shadow-lg: 0 28px 60px rgb(24 32 27 / 0.16);
+
+  --breakpoint-sm: 40rem;
+  --breakpoint-md: 48rem;
+  --breakpoint-lg: 64rem;
+  --breakpoint-xl: 80rem;
+  --breakpoint-2xl: 96rem;
+
+  --ease-snappy: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-gentle: cubic-bezier(0.24, 0.92, 0.32, 1);
+  --animate-fade-in: fade-in 280ms var(--ease-gentle);
+  --animate-rise-in: rise-in 420ms var(--ease-snappy);
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.75rem);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@layer base {
+  :root {
+    color-scheme: light;
+    --ui-bg: var(--color-off-white);
+    --ui-bg-muted: var(--color-neutral-50);
+    --ui-bg-elevated: var(--color-neutral-100);
+    --ui-bg-accented: var(--color-neutral-200);
+    --ui-bg-inverted: var(--color-neutral-900);
+    --ui-border: color-mix(in oklab, var(--color-neutral-300) 80%, white);
+    --ui-border-strong: color-mix(in oklab, var(--color-neutral-500) 45%, white);
+    --ui-text: var(--color-neutral-900);
+    --ui-text-toned: var(--color-neutral-700);
+    --ui-text-muted: var(--color-neutral-600);
+    --ui-accent-soft: color-mix(in oklab, var(--color-secondary-300) 44%, white);
+    --ui-focus-ring: color-mix(in oklab, var(--color-primary-500) 72%, white);
+    --ui-secondary-contrast: var(--color-secondary-900);
+  }
 }
