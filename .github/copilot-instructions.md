@@ -1,3 +1,41 @@
+# Guidelines for Agents
+
+## General Guidelines
+
+- Always follow the instructions in this file and ask questions if you are unsure about any aspect of the design, code quality requirements, or brand guidelines.
+- When writing or revising user-facing language, refer to `BRAND.md` for tone, terminology, positioning, product promise, and strategic guardrails. When there is a conflict between generic writing preferences and brand guidance, follow `BRAND.md`.
+- For implementing features, refer to `PRD.md` for the product requirements and user stories. Use the PRD as the starting point for understanding the feature, then design full feature specs around it and finally implement it. If there are any ambiguities or questions about the requirements, ask for clarification before proceeding. Don't use it for user-facing language guidance.
+
+## Code Quality Requirements
+
+- Follow standard TypeScript conventions and best practices
+- Use the Composition API when creating Vue components
+- Use clear, descriptive variable and function names
+- Accessibility should always be a first-class consideration and should be part of the initial planning and design.
+- Add comments only to explain complex logic or non-obvious implementations
+- Write unit tests for core functionality using `vitest`
+- Write end-to-end tests using Playwright and `@nuxt/test-utils`
+- Keep functions focused and manageable (generally under 50 lines)
+- Use error handling patterns consistently
+- Ensure you write strictly type-safe code, for example by ensuring you always check when accessing an array value by index
+- Don't add developer notes/states in the UI (e.g. "Dependency xyz not yet configured"), instead handle these cases by TODO comments or dev-side error logging.
+- Reuse predefined Tailwind classes and Nuxt UI components where possible instead of creating new styles (or custom combinations like `rounded-[var(...)]` or `color-mixin`) or components.
+
+## Code Organization
+
+In general, follow the standard Nuxt 4 project structure (Tool: get-documentation-page, path: "/docs/4.x/directory-structure") with the following additional guidelines.
+
+Vue:
+
+- Reusable Vue components belong at the top level of `app/components`.
+- Area-specific Vue components belong in a matching subfolder under `app/components` such as `app/components/inbox`.
+- Every new Vue component must have a colocated `.stories.vue` file
+
+Types:
+
+- Reusable TypeScript types and utilities belong in `app/types` (for frontend) or `shared/types` (used by both frontend and backend).
+- Component-specific types should be colocated in the same file as the component.
+
 <!--VITE PLUS START-->
 
 # Using Vite+, the Unified Toolchain for the Web
@@ -82,15 +120,37 @@ For GitHub Actions, consider using [`voidzero-dev/setup-vp`](https://github.com/
 - run: vp test
 ```
 
+<!--VITE PLUS END-->
+
 ## Brand Guidance for Agents
 
 - Read [`BRAND.md`](../BRAND.md) before writing or revising product copy, UX text, messaging, onboarding text, release notes, marketing content, or any user-facing AI text.
 - Use [`BRAND.md`](../BRAND.md) as the source of truth for tone, terminology, positioning, product promise, and strategic guardrails.
 - When there is a conflict between generic writing preferences and brand guidance, follow [`BRAND.md`](../BRAND.md).
 
+## UI and Design Guidance
+
+- Read [`design-system.md`](../design-system.md) before implementing or revising UI, layout, visual hierarchy, component styling, motion, or AI-facing interface language.
+- Use [`design-system.md`](../design-system.md) as the source of truth for design decisions, token usage, anti-patterns, and UI tradeoffs.
+- When there is a conflict between generic UI preferences and the design system, follow [`design-system.md`](../design-system.md).
+- Prefer existing Tailwind tokens, Nuxt UI components, and global theme config over one-off component styling.
+- If a design decision changes the primary action, visual emphasis, tone, or motion pattern and the correct choice is not obvious, ask for clarification instead of guessing.
+
 ## Review Checklist for Agents
 
 - [ ] Run `vp install` after pulling remote changes and before getting started.
 - [ ] If the change affects user-facing language, verify it aligns with [`BRAND.md`](../BRAND.md).
+- [ ] If the change affects UI or visual design, verify it aligns with [`design-system.md`](../design-system.md).
 - [ ] Run `vp check` and `vp test` to validate changes.
-<!--VITE PLUS END-->
+
+## Component Structure and Stories
+
+- Reusable Vue components belong at the top level of `app/components`.
+- Area-specific Vue components belong in a matching subfolder under `app/components` such as `app/components/inbox`.
+- Every new Vue component must have a colocated `.stories.vue` file next to it.
+- Component stories must use `storybook-vue-addon` SFC syntax with `<Stories>` and `<Story>` blocks rather than CSF `.ts` files.
+
+## Nuxt UI Theme Usage
+
+- Reusable visual overrides for Nuxt UI components must go in `app/app.config.ts` under the global `ui` theme config.
+- Before adding local `class` or `:ui` overrides to a Nuxt UI component, reuse or extend the existing global component theme and keep local overrides only for one-off layout concerns.
