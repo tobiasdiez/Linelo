@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { UBadge } from "#components";
+import { UBadge } from '#components'
 </script>
 
 <template>

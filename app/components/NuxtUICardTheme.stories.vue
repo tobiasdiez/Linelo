@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { UCard } from "#components";
+import { UCard } from '#components'
 </script>
 
 <template>

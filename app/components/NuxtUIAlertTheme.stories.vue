@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { UAlert } from "#components";
+import { UAlert } from '#components'
 </script>
 
 <template>
