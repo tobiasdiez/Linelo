@@ -1,3 +1,7 @@
+<script setup lang="ts">
+import { UAlert } from "#components";
+</script>
+
 <template>
   <Stories title="Nuxt UI/Alert Theme">
     <Story title="Primary">

@@ -1,3 +1,7 @@
+<script setup lang="ts">
+import { UBadge } from "#components";
+</script>
+
 <template>
   <Stories title="Nuxt UI/Badge Theme">
     <Story title="Default">

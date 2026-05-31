@@ -9,6 +9,8 @@
 
   /* Colors */
   --color-*: initial;
+  --color-white: #ffffff;
+  --color-black: #000000;
 
   /* https://uihue.com?c=b2tsY2goNDcuOTQlIDAuMDc4IDE2MS4wOCk= */
   --color-primary-50: oklch(97.9% 0.021 160.28);
@@ -22,6 +24,7 @@
   --color-primary-800: oklch(47.94% 0.078 161.08);
   --color-primary-900: oklch(40.17% 0.0685 163.11);
   --color-primary-950: oklch(26.2% 0.051 166.72);
+  --color-primary: var(--color-primary-800);
 
   /* https://uihue.com?c=b2tsY2goNzQuNDMlIDAuMTQ0MiA4NS41NCk= */
   --color-secondary-50: oklch(98.7% 0.026 102.21);
@@ -35,6 +38,7 @@
   --color-secondary-800: oklch(45.572% 0.09808 61.4);
   --color-secondary-900: oklch(41.086% 0.08704 57.201);
   --color-secondary-950: oklch(28.6% 0.066 53.306);
+  --color-secondary: var(--color-secondary-500);
 
   /* https://uihue.com?c=b2tsY2goMjMuMzclIDAuMDE1IDE1Ny41OSk= */
   --color-neutral-50: oklch(98.5% 0 157.59);
@@ -48,6 +52,7 @@
   --color-neutral-800: oklch(29.451% 0.01333 157.59);
   --color-neutral-900: oklch(23.37% 0.015 157.59);
   --color-neutral-950: oklch(14.5% 0 157.59);
+  --color-neutral: var(--color-neutral-500);
 
   --color-off-white: oklch(0.9605 0.0108 95.16);
 
@@ -63,6 +68,7 @@
   --color-amber-800: oklch(0.473 0.137 46.201);
   --color-amber-900: oklch(0.414 0.112 45.904);
   --color-amber-950: oklch(0.279 0.077 45.635);
+  --color-amber: var(--color-amber-500);
 
   /* https://tailwindcolor.com/red */
   --color-red-50: oklch(0.971 0.013 17.38);
@@ -76,6 +82,7 @@
   --color-red-800: oklch(0.444 0.177 26.899);
   --color-red-900: oklch(0.396 0.141 25.723);
   --color-red-950: oklch(0.258 0.092 26.042);
+  --color-red: var(--color-red-500);
 
   --text-2xs: 0.6875rem;
   --text-2xs--line-height: 1rem;
@@ -176,20 +183,5 @@
     --ui-accent-soft: color-mix(in oklab, var(--color-secondary-300) 44%, white);
     --ui-focus-ring: color-mix(in oklab, var(--color-primary-500) 72%, white);
     --ui-secondary-contrast: var(--color-secondary-900);
-  }
-}
-
-@layer components {
-  .surface-card {
-    border: 1px solid var(--ui-border);
-    border-radius: var(--radius-xl);
-    background-color: var(--ui-bg-muted);
-    box-shadow: var(--shadow-sm);
-  }
-
-  .surface-inset {
-    border: 1px solid var(--ui-border);
-    border-radius: var(--radius-md);
-    background-color: var(--ui-bg-elevated);
   }
 }

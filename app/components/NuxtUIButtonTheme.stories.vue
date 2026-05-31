@@ -1,3 +1,7 @@
+<script setup lang="ts">
+import { UButton } from "#components";
+</script>
+
 <template>
   <Stories title="Nuxt UI/Button Theme">
     <Story title="Default">
