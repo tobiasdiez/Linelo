@@ -50,12 +50,14 @@ Avoid these patterns unless there is a strong, explicit reason not to:
 
 ### Brand palette
 
-| Token           | Role                      | Value                        |
-| --------------- | ------------------------- | ---------------------------- |
-| `primary-800`   | Core brand green          | `oklch(47.94% 0.078 161.08)` |
-| `secondary-500` | Gold accent               | `oklch(74.43% 0.1442 85.54)` |
-| `off-white`     | Canvas / page background  | `oklch(98.7% 0.006 95.16)`   |
-| `neutral-900`   | Primary text / dark slate | `oklch(23.37% 0.015 157.59)` |
+| Token           | Role                      | Value                                   |
+| --------------- | ------------------------- | --------------------------------------- |
+| `primary-800`   | Core brand green          | `oklch(47.94% 0.078 161.08)`, `#2f6b4f` |
+| `secondary-500` | Gold accent               | `oklch(74.43% 0.1442 85.54)`, `#d5a422` |
+| `off-white`     | Canvas / page background  | `oklch(96.05% 0.0108 95.16)`, `#f4f2ea` |
+| `neutral-900`   | Primary text / dark slate | `oklch(23.37% 0.015 157.59)`, `#18201b` |
+
+(https://coolors.co/2f6b4f-d5a422-f4f2ea-18201b)
 
 ### Palette roles
 

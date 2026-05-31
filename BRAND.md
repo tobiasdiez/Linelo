@@ -142,15 +142,6 @@ Linelo should not sound:
 
 ## Visual Direction
 
-### Primary Colors
-
-- Muted green (`oklch(0.4794 0.078 161.08)`, `#2f6b4f`)
-- Gold (`oklch(0.7443 0.1442 85.54)`, `#d5a422`)
-- Off-white (`oklch(0.9605 0.0108 95.16)`, `#f4f2ea`)
-- Dark slate (`oklch(0.2337 0.015 157.59)`, `#18201b`)
-
-(https://coolors.co/2f6b4f-d5a422-f4f2ea-18201b)
-
 ### Typography
 
 - Sans-serif
