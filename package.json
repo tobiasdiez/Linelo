@@ -35,7 +35,7 @@
     "@types/node": "^25.6.0",
     "exsolve": "^1.0.8",
     "h3": "2.0.1-rc.22",
-    "rolldown": "1.0.1",
+    "rolldown": "1.2.2",
     "storybook": "10.4.0",
     "storybook-vue-addon": "0.7.1",
     "vite-plus": "0.1.21"
