@@ -49,13 +49,13 @@ importers:
         specifier: https://pkg.pr.new/@nuxtjs/storybook@2a17f94
         version: https://pkg.pr.new/@nuxtjs/storybook@2a17f94(b1608d9bd8949d2c81d82f947cbc73a3)
       '@playwright/test':
-        specifier: ^1.60.0
+        specifier: 1.60.0
         version: 1.60.0
       '@types/node':
         specifier: 25.8.0
         version: 25.8.0
       exsolve:
-        specifier: ^1.0.8
+        specifier: 1.0.8
         version: 1.0.8
       h3:
         specifier: 2.0.1-rc.22

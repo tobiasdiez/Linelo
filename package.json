@@ -31,9 +31,9 @@
     "@nuxt/eslint-plugin": "1.15.2",
     "@nuxt/test-utils": "4.0.3",
     "@nuxtjs/storybook": "https://pkg.pr.new/@nuxtjs/storybook@2a17f94",
-    "@playwright/test": "^1.60.0",
+    "@playwright/test": "1.60.0",
     "@types/node": "25.8.0",
-    "exsolve": "^1.0.8",
+    "exsolve": "1.0.8",
     "h3": "2.0.1-rc.22",
     "rolldown": "1.2.2",
     "storybook": "10.5.7",
@@ -41,7 +41,7 @@
     "vite-plus": "0.1.21"
   },
   "engines": {
-    "node": "24"
+    "node": "v24.19.0"
   },
   "packageManager": "pnpm@10.33.0"
 }
