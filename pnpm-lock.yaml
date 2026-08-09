@@ -52,7 +52,7 @@ importers:
         specifier: ^1.60.0
         version: 1.60.0
       '@types/node':
-        specifier: ^25.6.0
+        specifier: 25.8.0
         version: 25.8.0
       exsolve:
         specifier: ^1.0.8
