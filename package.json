@@ -32,7 +32,7 @@
     "@nuxt/test-utils": "4.0.3",
     "@nuxtjs/storybook": "https://pkg.pr.new/@nuxtjs/storybook@2a17f94",
     "@playwright/test": "1.62.1",
-    "@types/node": "25.8.0",
+    "@types/node": "25.9.5",
     "exsolve": "1.0.8",
     "h3": "2.0.1-rc.29",
     "rolldown": "1.2.6",
