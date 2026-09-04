@@ -41,7 +41,7 @@
     "vite-plus": "0.1.21"
   },
   "engines": {
-    "node": "v24.19.0"
+    "node": "24.20.0"
   },
   "packageManager": "pnpm@10.33.0"
 }
