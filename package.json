@@ -18,18 +18,18 @@
     "storybook:build": "storybook build"
   },
   "dependencies": {
-    "@nuxt/ui": "4.7.1",
+    "@nuxt/ui": "4.11.0",
     "@vitest/coverage-v8": "4.1.6",
-    "nuxt": "4.4.5",
-    "tailwindcss": "4.3.0",
-    "vue": "3.5.34",
-    "vue-router": "5.0.7"
+    "nuxt": "4.5.2",
+    "tailwindcss": "4.3.3",
+    "vue": "3.5.42",
+    "vue-router": "5.3.1"
   },
   "devDependencies": {
     "@chromatic-com/storybook": "5.3.1",
-    "@nuxt/devtools-kit": "4.0.0-alpha.4",
-    "@nuxt/eslint-plugin": "1.15.2",
-    "@nuxt/test-utils": "4.0.3",
+    "@nuxt/devtools-kit": "4.0.0-alpha.16",
+    "@nuxt/eslint-plugin": "1.17.0",
+    "@nuxt/test-utils": "4.2.0",
     "@nuxtjs/storybook": "https://pkg.pr.new/@nuxtjs/storybook@2a17f94",
     "@playwright/test": "1.62.1",
     "@types/node": "25.9.5",
