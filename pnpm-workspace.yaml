@@ -6,8 +6,8 @@ ignoredBuiltDependencies:
 overrides:
   vite: 'npm:@voidzero-dev/vite-plus-core@latest'
   vitest: 'npm:@voidzero-dev/vite-plus-test@latest'
-  '@nuxt/devtools': '4.0.0-alpha.4'
-  '@nuxt/devtools-kit': '4.0.0-alpha.4'
+  '@nuxt/devtools': '4.0.0-alpha.16'
+  '@nuxt/devtools-kit': '4.0.0-alpha.16'
 
 peerDependencyRules:
   allowAny:
