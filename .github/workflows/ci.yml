@@ -23,9 +23,9 @@ jobs:
           fetch-depth: 0
 
       - name: Install dependencies
-        uses: voidzero-dev/setup-vp@49c3e4e92c52e7f8392712a9267bbe71c5ab30e5 # v1.19.0
+        uses: voidzero-dev/setup-vp@3754dd7dbdb32bd8f6d28b6043de13ad3a75f21f # v1.21.1
         with:
-          node-version: '24'
+          node-version: 'v24.21.0'
           cache: true
 
       - name: Run linter
@@ -47,9 +47,9 @@ jobs:
           fetch-depth: 0
 
       - name: Install dependencies
-        uses: voidzero-dev/setup-vp@49c3e4e92c52e7f8392712a9267bbe71c5ab30e5 # v1.19.0
+        uses: voidzero-dev/setup-vp@3754dd7dbdb32bd8f6d28b6043de13ad3a75f21f # v1.21.1
         with:
-          node-version: '24'
+          node-version: 'v24.21.0'
           cache: true
 
       - name: Install Playwright browsers
@@ -67,7 +67,7 @@ jobs:
 
       - name: Publish and test Storybook
         if: always() && matrix.os == 'ubuntu-latest'
-        uses: chromaui/action@2a0b63f30233c48591844a46d451b9cf68128186 # v18.7.2
+        uses: chromaui/action@db3ceb5efb0cd7447d63c2d8cce7da732ce89322 # v18.10.1
         with:
           projectToken: 'chpt_12a8831ee2a9ae4'
           # Don't wait until Chroma verified the build (for this we have the Github check)
@@ -77,6 +77,6 @@ jobs:
 
       - name: Upload coverage to Codecov
         if: matrix.os == 'ubuntu-latest'
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
