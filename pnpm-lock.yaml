@@ -1004,7 +1004,7 @@ packages:
     resolution: {integrity: sha512-cC6RfgZh3guHBMLLjrBB2Uti5eUoGM9KyauOaYS9ETmxNWBMTvpgjvSiSJp1OFljIXPIqVTJ3xtJpSNZiO3ZaA==}
 
   '@nuxtjs/storybook@https://pkg.pr.new/@nuxtjs/storybook@2a17f94':
-    resolution: {integrity: sha512-6sTutWgn3CKC6S0G4TiEW/FnPX5tsLxmGWeyOsYWjuikPEeGqfzt9KX9riChZU8PPq29XA4Rnclp+e7crFJ2GQ==, tarball: https://pkg.pr.new/@nuxtjs/storybook@2a17f94}
+    resolution: {tarball: https://pkg.pr.new/@nuxtjs/storybook@2a17f94}
     version: 9.0.1
     engines: {node: '>=20.19.0'}
     peerDependencies:
@@ -2558,7 +2558,7 @@ packages:
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
 
   '@storybook-vue/nuxt@https://pkg.pr.new/nuxt-modules/storybook/@storybook-vue/nuxt@2a17f94':
-    resolution: {integrity: sha512-HIP2g8c+xML6YTx+BoMAeS8TA23Wj1qRvOC6FAc9tJTIky5ZD1NFeZeeovtj8j9dDnC1Y0AS1KypfJ/GXpj3MA==, tarball: https://pkg.pr.new/nuxt-modules/storybook/@storybook-vue/nuxt@2a17f94}
+    resolution: {tarball: https://pkg.pr.new/nuxt-modules/storybook/@storybook-vue/nuxt@2a17f94}
     version: 9.0.1
     engines: {node: '>=20.19.0'}
     peerDependencies:
@@ -7125,6 +7125,9 @@ packages:
   vue-component-type-helpers@3.3.11:
     resolution: {integrity: sha512-LwcxzeliO9fkQcpJG0PoX8X5kmAhKmH9wkpDLxNabwzkQ9Zeib2YVHwFV4pcWmMLfXVfjr/dSV+DaJ3cIPgSNA==}
 
+  vue-component-type-helpers@3.3.12:
+    resolution: {integrity: sha512-HwCqmgTfLFskQc4P5TRnbduCMyPat2Ezu0elLWOGn0dD/6BKHP15B5bxce6aDi+E4kblPtru8amIBQzu0Di3qQ==}
+
   vue-demi@0.14.10:
     resolution: {integrity: sha512-nMZBOwuzabUO0nLgIcc6rycZEebF6eeUfaiQx9+WSk8e29IbLvPU9feI6tqW4kTo3hvoYAJkMh8n8D0fuISphg==}
     engines: {node: '>=12'}
@@ -9824,7 +9827,7 @@ snapshots:
       storybook: 10.6.0(react@19.3.0)(vite-plus@0.1.21(@types/node@25.9.5)(@vitest/coverage-v8@4.1.6)(esbuild@0.28.2)(jiti@2.7.0)(publint@0.3.24)(terser@5.51.2)(typescript@5.9.3)(vite@8.3.1(@types/node@25.9.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(yaml@2.9.1))(yaml@2.9.1))
       type-fest: 2.19.0
       vue: 3.5.34(typescript@5.9.3)
-      vue-component-type-helpers: 3.3.11
+      vue-component-type-helpers: 3.3.12
 
   '@swc/helpers@0.5.23':
     dependencies:
@@ -14834,6 +14837,8 @@ snapshots:
   vue-component-type-helpers@2.2.12: {}
 
   vue-component-type-helpers@3.3.11: {}
+
+  vue-component-type-helpers@3.3.12: {}
 
   vue-demi@0.14.10(vue@3.5.34(typescript@5.9.3)):
     dependencies:
