@@ -4,8 +4,8 @@ allowBuilds:
   'vue-demi': false
 
 overrides:
-  '@nuxt/devtools': '4.0.0-alpha.4'
-  '@nuxt/devtools-kit': '4.0.0-alpha.4'
+  '@nuxt/devtools': '4.0.0'
+  '@nuxt/devtools-kit': '4.0.0'
   vite@*: 'catalog:'
   vitest@*: 'catalog:'
 
