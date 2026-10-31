@@ -31,7 +31,7 @@
     "@nuxt/eslint-plugin": "1.15.2",
     "@nuxt/test-utils": "4.0.3",
     "@nuxtjs/storybook": "10.0.3",
-    "@playwright/test": "1.62.1",
+    "@playwright/test": "1.64.1",
     "@types/node": "25.9.9",
     "exsolve": "1.1.1",
     "h3": "2.0.1-rc.30",
