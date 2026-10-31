@@ -1,0 +1,14 @@
+<script>
+  // @nuxtjs/color-mode reads `window.__NUXT_COLOR_MODE__` when its client plugin
+  // module is evaluated. Nuxt injects the script that defines it into the page <head>, but Storybook
+  // renders stories in its own iframe without that script, so the plugin would crash with
+  // "can't access property 'preference', helper is undefined".
+  // Provide a minimal stub so stories render in a deterministic light color mode.
+  window.__NUXT_COLOR_MODE__ = {
+    preference: 'light',
+    value: 'light',
+    getColorScheme: () => 'light',
+    addColorScheme: () => {},
+    removeColorScheme: () => {},
+  }
+</script>
