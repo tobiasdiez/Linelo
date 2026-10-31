@@ -21,13 +21,13 @@ export default defineConfig({
     rules: {
       // Disable sort-keys as this is often undesired
       'eslint/sort-keys': 'off',
-      // False-positives for imports from vite-plus/test. TODO: Reactivate this rule
-      'vitest/prefer-importing-vitest-globals': 'off',
+      // Vitest globals are not enabled, so they need to be imported
+      'vitest/no-importing-vitest-globals': 'off',
       // Verify correct test filename pattern
       'vitest/consistent-test-filename': [
         'error',
         {
-          pattern: '.*\\.spec\\.ts$',
+          pattern: String.raw`.*\.spec\.ts$`,
         },
       ],
       // Restrict prefer-expect-assertions as it is requires to much boilerplate otherwise
@@ -55,6 +55,8 @@ export default defineConfig({
       'eslint/max-statements': 'off',
       // Allow continue
       'eslint/no-continue': 'off',
+      // Allow multiple variable declarations instead of combining them into one statement
+      'eslint/one-var': 'off',
       // Allow ternary expressions
       'eslint/no-ternary': 'off',
       // Allow only certain magic numbers
@@ -105,7 +107,6 @@ export default defineConfig({
           environment: 'node',
         },
       },
-      // @ts-expect-error: type error upstream
       () =>
         defineVitestProject({
           test: {
@@ -128,7 +129,6 @@ export default defineConfig({
             },
             browser: {
               enabled: true,
-              // @ts-expect-error: type error upstream
               provider: playwright(),
               instances: [{ browser: 'chromium', headless: true }],
             },
