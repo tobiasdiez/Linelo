@@ -30,7 +30,7 @@
     "@nuxt/devtools-kit": "4.0.0-alpha.4",
     "@nuxt/eslint-plugin": "1.15.2",
     "@nuxt/test-utils": "4.0.3",
-    "@nuxtjs/storybook": "https://pkg.pr.new/@nuxtjs/storybook@2a17f94",
+    "@nuxtjs/storybook": "10.0.3",
     "@playwright/test": "1.62.1",
     "@types/node": "25.9.5",
     "exsolve": "1.1.1",
