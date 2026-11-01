@@ -11,6 +11,8 @@ const config: StorybookConfig = {
     options: {},
   },
   // Need to specify stories as workaround for https://github.com/storybookjs/storybook/issues/20761
-  stories: ['../app/components/*.stories.vue'],
+  stories: ['../app/components/**/*.stories.vue'],
+  // Serves `/logo.svg` and other public assets
+  staticDirs: ['../public'],
 }
 export default config

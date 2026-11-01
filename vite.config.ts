@@ -21,24 +21,6 @@ export default defineConfig({
     rules: {
       // Disable sort-keys as this is often undesired
       'eslint/sort-keys': 'off',
-      // Vitest globals are not enabled, so they need to be imported
-      'vitest/no-importing-vitest-globals': 'off',
-      // Verify correct test filename pattern
-      'vitest/consistent-test-filename': [
-        'error',
-        {
-          pattern: String.raw`.*\.spec\.ts$`,
-        },
-      ],
-      // Restrict prefer-expect-assertions as it is requires to much boilerplate otherwise
-      'vitest/prefer-expect-assertions': [
-        'error',
-        {
-          onlyFunctionsWithAsyncKeyword: true,
-          onlyFunctionsWithExpectInCallback: true,
-          onlyFunctionsWithExpectInLoop: true,
-        },
-      ],
       // Allow export statements everywhere (handy for eg nuxt modules)
       'import/exports-last': 'off',
       // Enforce function declarations
@@ -87,8 +69,32 @@ export default defineConfig({
           'import/no-nodejs-modules': 'off',
         },
       },
+      {
+        files: ['test/**'],
+        plugins: ['vitest'],
+        rules: {
+          // Vitest globals are not enabled, so they need to be imported
+          'vitest/no-importing-vitest-globals': 'off',
+          // Verify correct test filename pattern
+          'vitest/consistent-test-filename': [
+            'error',
+            {
+              pattern: String.raw`.*\.spec\.ts$`,
+            },
+          ],
+          // Restrict prefer-expect-assertions as it is requires to much boilerplate otherwise
+          'vitest/prefer-expect-assertions': [
+            'error',
+            {
+              onlyFunctionsWithAsyncKeyword: true,
+              onlyFunctionsWithExpectInCallback: true,
+              onlyFunctionsWithExpectInLoop: true,
+            },
+          ],
+        },
+      },
     ],
-    plugins: ['eslint', 'import', 'unicorn', 'typescript', 'oxc', 'vue', 'vitest'],
+    plugins: ['eslint', 'import', 'unicorn', 'typescript', 'oxc', 'vue'],
   },
   test: {
     projects: [
