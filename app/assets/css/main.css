@@ -167,7 +167,11 @@
   }
 }
 
-@layer base {
+/*
+ * In `theme`, not `base`: icons rendered at runtime inject `@layer base` styles at the top of the
+ * document, which would move `base` before Nuxt UI's `theme` layer and let its defaults win.
+ */
+@layer theme {
   :root {
     color-scheme: light;
     --ui-bg: var(--color-off-white);
@@ -184,4 +188,30 @@
     --ui-focus-ring: color-mix(in oklab, var(--color-primary-500) 72%, white);
     --ui-secondary-contrast: var(--color-secondary-900);
   }
+}
+
+@layer base {
+  /* Tailwind's preflight resets buttons to the default cursor */
+  button:not(:disabled) {
+    cursor: pointer;
+  }
+
+  /* Below `lg`, keep focused fields and the caret clear of the action bar fixed to the bottom */
+  @media (width < 64rem) {
+    html {
+      scroll-padding-bottom: 7rem;
+    }
+  }
+}
+
+/* The design system's focus indicator, for raw elements; Nuxt UI components get it from the theme */
+@utility focus-ring {
+  outline: 2px solid var(--color-primary-600);
+  outline-offset: 2px;
+}
+
+/* For elements inside a container that clips overflow */
+@utility focus-ring-inset {
+  outline: 2px solid var(--color-primary-600);
+  outline-offset: -3px;
 }
