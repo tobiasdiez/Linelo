@@ -64,7 +64,7 @@ export default defineConfig({
         },
       },
       {
-        files: ['modules/**/*.ts'],
+        files: ['modules/**/*.ts', '.storybook/**/*.ts'],
         rules: {
           'import/no-nodejs-modules': 'off',
         },
