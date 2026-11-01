@@ -24,4 +24,6 @@ export default defineNuxtConfig({
     // The design system is light-only for the moment
     colorMode: false,
   },
+  // A new migration restarts the dev server, which applies it (server/plugins/migrate.ts)
+  watch: [/server\/db\/migrations\//],
 })
