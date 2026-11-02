@@ -47,7 +47,7 @@
     "drizzle-kit": "0.31.11",
     "exsolve": "1.1.1",
     "h3": "2.0.8",
-    "rolldown": "1.2.15",
+    "rolldown": "1.2.16",
     "storybook": "10.6.5",
     "storybook-vue-addon": "0.7.1",
     "vite": "catalog:",
