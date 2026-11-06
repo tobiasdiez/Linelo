@@ -45,7 +45,14 @@
     },
     { matchPackageNames: ['prisma', '@prisma{/,}**'], groupName: 'prisma' },
     {
-      matchPackageNames: ['@vitest{/,}**', 'vitest', 'vitest-**'],
+      // vite-plus bundles vitest and refuses a coverage provider of another version, so update them together
+      matchPackageNames: [
+        '@vitest{/,}**',
+        'vitest',
+        'vitest-**',
+        'vite-plus',
+        '@voidzero-dev{/,}**',
+      ],
       groupName: 'vitest',
     },
     {
