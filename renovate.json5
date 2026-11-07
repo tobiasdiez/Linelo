@@ -45,7 +45,13 @@
     },
     { matchPackageNames: ['prisma', '@prisma{/,}**'], groupName: 'prisma' },
     {
-      matchPackageNames: ['@vitest{/,}**', 'vitest', 'vitest-**'],
+      matchPackageNames: [
+        '@vitest{/,}**',
+        'vitest',
+        'vitest-**',
+        'vite-plus',
+        '@voidzero-dev{/,}**',
+      ],
       groupName: 'vitest',
     },
     {
