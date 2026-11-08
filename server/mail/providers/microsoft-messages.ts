@@ -41,13 +41,24 @@ function participants(recipients: NullableOption<Recipient[]> | undefined): Inbo
   return (recipients ?? []).map(entry => participant(entry)).filter(entry => entry !== undefined)
 }
 
+/** Removes every match, again and again, so that removing one tag cannot leave another behind. */
+function removeAll(text: string, pattern: RegExp): string {
+  let previous: string
+  let current = text
+  do {
+    previous = current
+    current = current.replaceAll(pattern, '')
+  } while (current !== previous)
+  return current
+}
+
 /** Crude, for the rare body Graph sends as HTML despite asking for text. Vue renders it as text anyway. */
 function htmlToText(html: string): string {
-  return html
-    .replaceAll(/<(?<tag>style|script)[\s\S]*?<\/\k<tag>>/gi, '')
+  const withoutCode = removeAll(html, /<(?<tag>style|script)[\s\S]*?<\/\k<tag>>/gi)
+  const withBreaks = withoutCode
     .replaceAll(/<br\s*\/?>/gi, '\n')
     .replaceAll(/<\/(?:p|div|li|tr|h\d)>/gi, '\n\n')
-    .replaceAll(/<[^>]+>/g, '')
+  return removeAll(withBreaks, /<[^>]+>/g)
     .replaceAll('&nbsp;', ' ')
     .replaceAll('&lt;', '<')
     .replaceAll('&gt;', '>')

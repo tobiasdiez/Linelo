@@ -278,7 +278,7 @@ describe('microsoft graph provider: unread threads', () => {
     const html = {
       contentType: 'html',
       content:
-        '<html><head><style>p { color: red }</style></head><body><p>Hi Mara,</p><div>Thursday works &amp; Friday too.<br>Lena</div></body></html>',
+        '<html><head><style>p { color: red }</style></head><body><p>Hi Mara,</p><div>Thursday works &amp; Friday too.<br>Lena</div><scr<script></script>ipt>alert(1)</script></body></html>',
     }
     const graph = fakeGraph({
       answer: request => {
