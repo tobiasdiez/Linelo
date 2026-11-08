@@ -43,12 +43,12 @@ function participants(recipients: NullableOption<Recipient[]> | undefined): Inbo
 
 /** Removes every match, again and again, so that removing one tag cannot leave another behind. */
 function removeAll(text: string, pattern: RegExp): string {
-  let previous: string
   let current = text
-  do {
-    previous = current
-    current = current.replaceAll(pattern, '')
-  } while (current !== previous)
+  let next = current.replaceAll(pattern, '')
+  while (next !== current) {
+    current = next
+    next = current.replaceAll(pattern, '')
+  }
   return current
 }
 
