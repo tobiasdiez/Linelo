@@ -132,6 +132,8 @@ export default defineConfig({
           name: 'unit',
           include: ['test/unit/**/*.spec.ts'],
           environment: 'node',
+          // Database specs start PGlite and migrate it per test, which takes 5–8 s on CI runners
+          testTimeout: 30_000,
         },
       },
       () =>
