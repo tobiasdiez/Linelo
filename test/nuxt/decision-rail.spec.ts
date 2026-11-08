@@ -1,5 +1,5 @@
 import { InboxDecisionRail, UApp } from '#components'
-import { defineComponent, h } from 'vue'
+import { defineComponent, h, ref } from 'vue'
 import { describe, expect, it, vi } from 'vite-plus/test'
 import { page, userEvent } from 'vite-plus/test/browser'
 import inboxBuilders from '~/data/inbox-builders'
@@ -15,10 +15,12 @@ interface RailSpies {
   onDelegate: ReturnType<typeof vi.fn<DelegateHandler>>
 }
 
-const { currentUser, storyItem, storySuggestion } = inboxBuilders
+const { mailboxOwner, signedInUser, storyItem, storySuggestion } = inboxBuilders
 const vendorReview = storyItem('thread-vendor-review')
 const confirm = storySuggestion('thread-vendor-review', 'vendor-review-confirm', 'reply')
-const recipients = replyAllRecipients(latestMessage(vendorReview.thread), currentUser)
+const recipients = replyAllRecipients(latestMessage(vendorReview.thread), mailboxOwner)
+/** Longer than the rail waits before it shows a spinner. */
+const PENDING_WAIT_MS = 400
 const SEND_KEYS = useKbd().macOS.value ? '{Meta>}{Enter}{/Meta}' : '{Control>}{Enter}{/Control}'
 
 /** Renders the rail inside `UApp`, runs the test body, and unmounts it again. */
@@ -26,6 +28,7 @@ async function withRail(
   run: (spies: RailSpies) => Promise<void>,
   { item = vendorReview, busy = false, mode = 'decide' } = {},
 ): Promise<void> {
+  useCurrentUser().set(signedInUser)
   const spies: RailSpies = {
     onResolve: vi.fn<ResolveHandler>(),
     onDelegate: vi.fn<DelegateHandler>(),
@@ -256,7 +259,9 @@ describe('decision rail', () => {
       async ({ onResolve }) => {
         await userEvent.keyboard('h')
 
-        await expect.element(page.getByRole('button', { name: 'Mark as handled' })).toBeDisabled()
+        await expect
+          .element(page.getByRole('button', { name: 'Mark as handled' }))
+          .toHaveAttribute('aria-disabled', 'true')
 
         expect(onResolve).not.toHaveBeenCalled()
       },
@@ -276,5 +281,48 @@ describe('decision rail', () => {
       },
       { busy: true, mode: 'reply' },
     )
+  })
+
+  it('shows a spinner on the pressed action only when the wait is noticeable', async () => {
+    expect.hasAssertions()
+
+    useCurrentUser().set(signedInUser)
+    const busy = ref(false)
+    const host = defineComponent({
+      render: () =>
+        h(UApp, () =>
+          h(InboxDecisionRail, {
+            item: vendorReview,
+            busy: busy.value,
+            onResolve: () => {
+              busy.value = true
+            },
+          }),
+        ),
+    })
+    const screen = await render(host)
+    const markAsHandled = page.getByRole('button', { name: 'Mark as handled' })
+    try {
+      // A quick answer: no spinner, also not after the delay
+      await userEvent.keyboard('h')
+      busy.value = false
+      await new Promise(resolve => {
+        setTimeout(resolve, PENDING_WAIT_MS)
+      })
+
+      expect(markAsHandled.element()).not.toHaveAttribute('data-pending')
+
+      // A slow one: the spinner comes after the delay, on the pressed action
+      await userEvent.keyboard('h')
+
+      expect(markAsHandled.element()).not.toHaveAttribute('data-pending')
+
+      await expect.element(markAsHandled).toHaveAttribute('data-pending')
+      await expect
+        .element(page.getByRole('button', { name: 'Add to Todoist' }))
+        .not.toHaveAttribute('data-pending')
+    } finally {
+      await screen.unmount()
+    }
   })
 })

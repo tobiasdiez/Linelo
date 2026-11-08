@@ -3,7 +3,7 @@ import ParticipantAvatar from './ParticipantAvatar.vue'
 import inboxBuilders from '~/data/inbox-builders'
 
 const lena = inboxBuilders.participant('Lena Hartmann')
-const { currentUser } = inboxBuilders
+const { mailboxOwner } = inboxBuilders
 </script>
 
 <template>
@@ -17,9 +17,9 @@ const { currentUser } = inboxBuilders
     </Story>
     <Story title="Current User">
       <div class="flex items-center gap-3 p-4">
-        <ParticipantAvatar :participant="currentUser" size="xs" />
-        <ParticipantAvatar :participant="currentUser" />
-        <ParticipantAvatar :participant="currentUser" size="2xl" />
+        <ParticipantAvatar :participant="mailboxOwner" size="xs" />
+        <ParticipantAvatar :participant="mailboxOwner" />
+        <ParticipantAvatar :participant="mailboxOwner" size="2xl" />
       </div>
     </Story>
   </Stories>

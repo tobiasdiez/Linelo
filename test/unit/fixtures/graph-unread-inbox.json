@@ -1,0 +1,29 @@
+{
+  "@odata.context": "https://graph.microsoft.com/v1.0/$metadata#users('me')/mailFolders('inbox')/messages(id,conversationId,receivedDateTime)",
+  "value": [
+    {
+      "@odata.etag": "W/\"CQAAABYAAAD2\"",
+      "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0A-lena-3",
+      "conversationId": "AAQkAGI2-conversation-vendor",
+      "receivedDateTime": "2026-10-12T09:43:00Z"
+    },
+    {
+      "@odata.etag": "W/\"CQAAABYAAAD3\"",
+      "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0A-newsletter-1",
+      "conversationId": "AAQkAGI2-conversation-newsletter",
+      "receivedDateTime": "2026-10-12T08:00:00Z"
+    },
+    {
+      "@odata.etag": "W/\"CQAAABYAAAD1\"",
+      "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0A-lena-2",
+      "conversationId": "AAQkAGI2-conversation-vendor",
+      "receivedDateTime": "2026-10-11T16:20:00Z"
+    },
+    {
+      "@odata.etag": "W/\"CQAAABYAAAD4\"",
+      "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0A-staging-1",
+      "conversationId": "AAQkAGI2-conversation-staging",
+      "receivedDateTime": "2026-10-11T07:15:00Z"
+    }
+  ]
+}

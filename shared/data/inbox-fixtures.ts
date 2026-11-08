@@ -1,8 +1,14 @@
-import currentUser from '~/data/current-user'
+import fixtureAccount from './fixture-account'
+import mara from './mailbox-owner'
+import queueItemKey from '../utils/queue-item-key'
 
 const MILLISECONDS_PER_MINUTE = 60_000
 const MINUTES_PER_HOUR = 60
 const HOURS_PER_DAY = 24
+
+function withKey(item: Omit<Inbox.QueueItem, 'key'>): Inbox.QueueItem {
+  return { key: queueItemKey(item.thread), ...item }
+}
 
 interface TimeAgo {
   days?: number
@@ -20,15 +26,17 @@ const newsletter: Inbox.Participant = {
 }
 
 function vendorReview(ago: (offset: TimeAgo) => string): Inbox.QueueItem {
-  return {
+  return withKey({
     thread: {
       id: 'thread-vendor-review',
+      accountId: fixtureAccount.id,
       subject: 'Vendor review: can we move sign-off to Thursday?',
       messages: [
         {
           id: 'vendor-review-1',
+          unread: false,
           from: lena,
-          to: [currentUser],
+          to: [mara],
           cc: [priya, marco],
           sentAt: ago({ days: 2, hours: 2 }),
           body: 'Hi Mara,\n\nStarting the Q3 vendor review. Attached is the shortlist and the current pricing from all three vendors. Procurement would like a decision before the renewal date.\n\nThanks,\nLena',
@@ -38,7 +46,8 @@ function vendorReview(ago: (offset: TimeAgo) => string): Inbox.QueueItem {
         },
         {
           id: 'vendor-review-2',
-          from: currentUser,
+          unread: false,
+          from: mara,
           to: [lena],
           cc: [priya, marco],
           sentAt: ago({ days: 2 }),
@@ -47,8 +56,9 @@ function vendorReview(ago: (offset: TimeAgo) => string): Inbox.QueueItem {
         },
         {
           id: 'vendor-review-3',
+          unread: true,
           from: lena,
-          to: [currentUser],
+          to: [mara],
           cc: [priya, marco],
           sentAt: ago({ minutes: 47 }),
           body: "Hi Mara,\n\nQuick follow-up on the Q3 vendor review. Procurement needs our sign-off by Thursday end of day so they can lock the renewal before the price change on the 1st.\n\nTwo things from your side:\n1. Does Thursday 14:00 work for the review call instead of Friday?\n2. Could you send the updated cost comparison before then? Last week's draft is attached, but the hosting numbers have changed.\n\nIf Thursday doesn't work, tell me today and I'll ask procurement for a short extension.\n\nThanks,\nLena",
@@ -82,19 +92,21 @@ function vendorReview(ago: (offset: TimeAgo) => string): Inbox.QueueItem {
         task: { title: 'Update cost comparison for Lena', due: 'Wednesday' },
       },
     ],
-  }
+  })
 }
 
 function offsiteVenue(ago: (offset: TimeAgo) => string): Inbox.QueueItem {
-  return {
+  return withKey({
     thread: {
       id: 'thread-offsite-venue',
+      accountId: fixtureAccount.id,
       subject: 'Offsite: book the Lisbon venue?',
       messages: [
         {
           id: 'offsite-1',
+          unread: false,
           from: priya,
-          to: [currentUser, marco],
+          to: [mara, marco],
           cc: [],
           sentAt: ago({ days: 3, hours: 4 }),
           body: 'Hi both,\n\nCould you confirm whether 14 and 15 November work for the team offsite? I have two venues on hold, one in Lisbon and one in Porto.\n\nPriya',
@@ -102,7 +114,8 @@ function offsiteVenue(ago: (offset: TimeAgo) => string): Inbox.QueueItem {
         },
         {
           id: 'offsite-2',
-          from: currentUser,
+          unread: false,
+          from: mara,
           to: [priya],
           cc: [marco],
           sentAt: ago({ days: 3 }),
@@ -111,8 +124,9 @@ function offsiteVenue(ago: (offset: TimeAgo) => string): Inbox.QueueItem {
         },
         {
           id: 'offsite-3',
+          unread: true,
           from: priya,
-          to: [currentUser],
+          to: [mara],
           cc: [marco],
           sentAt: ago({ hours: 3 }),
           body: 'Thanks Mara. The Lisbon venue can hold the dates until Friday, then they release them. The quote is attached and fits the budget we agreed on.\n\nShall I go ahead and book it?\n\nPriya',
@@ -138,19 +152,21 @@ function offsiteVenue(ago: (offset: TimeAgo) => string): Inbox.QueueItem {
         followUpTask: { title: 'Confirm offsite budget with finance', due: 'Thursday' },
       },
     ],
-  }
+  })
 }
 
 function stagingUpdate(ago: (offset: TimeAgo) => string): Inbox.QueueItem {
-  return {
+  return withKey({
     thread: {
       id: 'thread-staging',
+      accountId: fixtureAccount.id,
       subject: 'Staging is back up',
       messages: [
         {
           id: 'staging-1',
+          unread: true,
           from: jonas,
-          to: [currentUser, priya, marco],
+          to: [mara, priya, marco],
           cc: [],
           sentAt: ago({ hours: 5 }),
           body: "Hi all,\n\nStaging is back up after this morning's database migration. Nothing changes on your side, deploys work as before.\n\nJonas",
@@ -168,19 +184,21 @@ function stagingUpdate(ago: (offset: TimeAgo) => string): Inbox.QueueItem {
         draft: 'Thanks Jonas, good to know.\n\nMara',
       },
     ],
-  }
+  })
 }
 
 function migrationPlan(ago: (offset: TimeAgo) => string): Inbox.QueueItem {
-  return {
+  return withKey({
     thread: {
       id: 'thread-migration-plan',
+      accountId: fixtureAccount.id,
       subject: 'Hosting migration plan for review',
       messages: [
         {
           id: 'migration-1',
+          unread: false,
           from: marco,
-          to: [currentUser],
+          to: [mara],
           cc: [jonas],
           sentAt: ago({ days: 6 }),
           body: "Mara, as discussed I'm writing up the plan for moving off the old hosting provider. First draft by the end of the week.\n\nMarco",
@@ -188,7 +206,8 @@ function migrationPlan(ago: (offset: TimeAgo) => string): Inbox.QueueItem {
         },
         {
           id: 'migration-2',
-          from: currentUser,
+          unread: false,
+          from: mara,
           to: [marco],
           cc: [jonas],
           sentAt: ago({ days: 5, hours: 20 }),
@@ -197,17 +216,19 @@ function migrationPlan(ago: (offset: TimeAgo) => string): Inbox.QueueItem {
         },
         {
           id: 'migration-3',
+          unread: false,
           from: jonas,
           to: [marco],
-          cc: [currentUser],
+          cc: [mara],
           sentAt: ago({ days: 5 }),
           body: 'Marco, happy to review the database part once you have it. We should avoid the week of the 17th, that is release week.\n\nJonas',
           attachments: [],
         },
         {
           id: 'migration-4',
+          unread: true,
           from: marco,
-          to: [currentUser],
+          to: [mara],
           cc: [jonas],
           sentAt: ago({ days: 1, hours: 6 }),
           body: "Here is the plan. It's long, sorry. The short version: we move in three steps over two weekends, and nothing customer-facing changes until the last step.\n\nContext\nThe current contract ends on 31 January. Renewing would cost about 40% more than today, and the provider has not shipped the managed database version we need. Staying is possible, but it gets more expensive every quarter.\n\nStep 1: storage and backups\nWe copy object storage and nightly backups to the new provider first. Both sides run in parallel for two weeks, so we can compare restore times and costs before anything depends on it. Jonas has already tested a full restore on the new side; it took 38 minutes instead of 70.\n\nStep 2: database\nThe database moves on the first weekend. We put the app in read-only mode for about 40 minutes, replicate the last changes, then switch the connection string. Rollback is switching the connection string back; the old database stays untouched for a week.\n\nStep 3: application servers\nThe app servers move on the second weekend. This is the only step customers could notice, so we schedule it for Sunday morning and keep the old servers warm until Tuesday.\n\nCost\nThe estimate is in the attached sheet. In short: about 18% cheaper than today, and roughly a third cheaper than renewing.\n\nWhat I need from you\nA yes or no on the overall approach by Monday, so I can book the weekends with the provider. Details can still change after that.\n\nMarco",
@@ -241,19 +262,21 @@ function migrationPlan(ago: (offset: TimeAgo) => string): Inbox.QueueItem {
           'Hi Marco,\n\nThanks for writing this up. Could you walk me through it in 20 minutes this week? Then I can give you an answer before Monday.\n\nMara',
       },
     ],
-  }
+  })
 }
 
 function newsletterIssue(ago: (offset: TimeAgo) => string): Inbox.QueueItem {
-  return {
+  return withKey({
     thread: {
       id: 'thread-newsletter',
+      accountId: fixtureAccount.id,
       subject: 'Issue 212: The quiet case for fewer meetings',
       messages: [
         {
           id: 'newsletter-1',
+          unread: true,
           from: newsletter,
-          to: [currentUser],
+          to: [mara],
           cc: [],
           sentAt: ago({ days: 1, hours: 10 }),
           body: "This week: why the best-run teams we spoke to cut their recurring meetings by half, a reader's template for async status updates, and three tools we stopped using.\n\nRead the full issue on our website.\n\nYou are receiving this because you subscribed to Operator Weekly.",
@@ -263,7 +286,55 @@ function newsletterIssue(ago: (offset: TimeAgo) => string): Inbox.QueueItem {
     },
     whyShown: 'A newsletter you subscribed to. Nothing in it needs an answer.',
     suggestions: [{ kind: 'handled', id: 'newsletter-handled', label: 'Nothing to act on' }],
-  }
+  })
+}
+
+function deliveryNotice(ago: (offset: TimeAgo) => string): Inbox.QueueItem {
+  return withKey({
+    thread: {
+      id: 'thread-delivery',
+      accountId: fixtureAccount.id,
+      subject: 'Your order is on its way',
+      messages: [
+        {
+          id: 'delivery-1',
+          unread: true,
+          from: { name: 'Parcel Post', email: 'no-reply@parcelpost.example' },
+          to: [mara],
+          cc: [],
+          sentAt: ago({ days: 2, hours: 1 }),
+          body: 'Your order 4471-2209 left our warehouse and arrives on Thursday.\n\nTrack it here: https://track.parcelpost.example/redirect?utm_source=email&utm_medium=transactional&utm_campaign=shipment_notification&tracking=PP4471220998XX&signature=7f3a9c2e1b8d4f6a0c5e9b2d7a1f3c8e6b4d2a0f9e7c5b3a1d8f6e4c2b0a9e7c\n\nParcel Post',
+          attachments: [],
+        },
+      ],
+    },
+    whyShown: 'A delivery notice. Nothing in it needs an answer.',
+    suggestions: [],
+  })
+}
+
+function printerScan(ago: (offset: TimeAgo) => string): Inbox.QueueItem {
+  return withKey({
+    thread: {
+      id: 'thread-scan',
+      accountId: fixtureAccount.id,
+      subject: 'Scanned document',
+      messages: [
+        {
+          id: 'scan-1',
+          unread: true,
+          from: { name: 'Office printer', email: 'printer@northwind.co' },
+          to: [mara],
+          cc: [],
+          sentAt: ago({ days: 2, hours: 3 }),
+          body: '',
+          attachments: [{ id: 'scan', name: 'scan-0042.pdf', sizeBytes: 524_288 }],
+        },
+      ],
+    },
+    whyShown: 'A scan from the office printer. Nothing in it needs an answer.',
+    suggestions: [],
+  })
 }
 
 /**
@@ -282,6 +353,8 @@ function createInboxFixtures(now: Date = new Date()): Inbox.QueueItem[] {
     stagingUpdate(ago),
     migrationPlan(ago),
     newsletterIssue(ago),
+    deliveryNotice(ago),
+    printerScan(ago),
   ]
 }
 

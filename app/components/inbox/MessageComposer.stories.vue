@@ -4,11 +4,11 @@ import inboxBuilders from '~/data/inbox-builders'
 import latestMessage from '#shared/utils/latest-message'
 import replyAllRecipients from '#shared/utils/reply-all-recipients'
 
-const { currentUser, storyItem, storySuggestion } = inboxBuilders
+const { mailboxOwner, storyItem, storySuggestion } = inboxBuilders
 const confirm = storySuggestion('thread-vendor-review', 'vendor-review-confirm', 'reply')
 const recipients = replyAllRecipients(
   latestMessage(storyItem('thread-vendor-review').thread),
-  currentUser,
+  mailboxOwner,
 )
 </script>
 

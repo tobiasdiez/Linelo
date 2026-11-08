@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from 'vite-plus/test'
+import { describe, expect, it, onTestFinished, vi } from 'vite-plus/test'
+import fakeInbox from './fake-inbox-api'
 import inboxBuilders from '~/data/inbox-builders'
 
 const { participant, queueItem } = inboxBuilders
@@ -10,20 +11,25 @@ const reply: Inbox.TerminalAction = {
   cc: [],
   followUpTask: { title: 'Send the sheet to Lena', due: 'Wednesday' },
 }
+const items = [queueItem({ id: 'a' }), queueItem({ id: 'b' }), queueItem({ id: 'c' })]
+const REFILL_PAGE = useInboxQueue.pageSizes.refill
 
-/** A queue seeded with three items, with spies on the (succeeding) adapters. */
+/** A queue seeded with three items, the same on the server, with spies on the (succeeding) adapters. */
 function freshQueue() {
   vi.restoreAllMocks()
+  const api = fakeInbox.api(items)
+  onTestFinished(() => api.restore())
   const mail = useMailActions()
   const tasks = useTaskManager()
   const spies = {
     sendReply: vi.spyOn(mail, 'sendReply'),
     markAsHandled: vi.spyOn(mail, 'markAsHandled'),
+    markAsUnhandled: vi.spyOn(mail, 'markAsUnhandled'),
     createTask: vi.spyOn(tasks, 'createTask'),
   }
   const queue = useInboxQueue()
-  queue.reset([queueItem({ id: 'a' }), queueItem({ id: 'b' }), queueItem({ id: 'c' })])
-  return { queue, spies }
+  queue.reset(items)
+  return { queue, spies, api }
 }
 
 describe('inbox queue', () => {
@@ -104,19 +110,70 @@ describe('inbox queue', () => {
     await expect(replying).resolves.toMatchObject({ followUpFailed: false })
   })
 
-  it('brings back exactly the undone item', async () => {
+  it('brings back exactly the undone item, and marks it unread again', async () => {
     expect.hasAssertions()
 
-    const { queue } = freshQueue()
+    const { queue, spies } = freshQueue()
+    const [first] = items
     await queue.resolve({ kind: 'handled' })
-    await queue.resolve({ kind: 'task', task: { title: 'Follow up' } })
+    await queue.resolve({ kind: 'handled' })
 
-    queue.undo('a')
+    await queue.undo(first?.key ?? '')
 
     expect(queue.current.value?.thread.id).toBe('a')
+    expect(spies.markAsUnhandled).toHaveBeenCalledExactlyOnceWith(first?.thread)
 
     await queue.resolve({ kind: 'handled' })
 
     expect(queue.current.value?.thread.id).toBe('c')
+  })
+
+  it('reverts only Mark as handled in the mailbox on undo', async () => {
+    expect.hasAssertions()
+
+    const { queue, spies } = freshQueue()
+    const [first] = items
+    await queue.resolve({ kind: 'task', task: { title: 'Follow up' } })
+
+    await queue.undo(first?.key ?? '')
+
+    expect(queue.current.value?.thread.id).toBe('a')
+    expect(spies.markAsUnhandled).not.toHaveBeenCalled()
+  })
+
+  it('does not bring back an item that a refill in flight still lists', async () => {
+    expect.hasAssertions()
+
+    const { queue, api } = freshQueue()
+    const gate = Promise.withResolvers<Inbox.QueueItem[]>()
+    api.inbox.answer = () => gate.promise
+    const refilling = queue.refill()
+    await vi.waitFor(() => expect(api.inboxLimits()).toStrictEqual([String(REFILL_PAGE)]))
+
+    await queue.resolve({ kind: 'handled' })
+    gate.resolve(items)
+    await refilling
+
+    expect(queue.current.value?.thread.id).toBe('b')
+  })
+
+  it('refills in the background when two items are left', async () => {
+    expect.hasAssertions()
+
+    const { queue, api } = freshQueue()
+    const newMail = queueItem({ id: 'd' })
+    api.inbox.answer = () => [...items, newMail]
+
+    await queue.resolve({ kind: 'handled' })
+
+    await vi.waitFor(() =>
+      expect(
+        queue.current.value && [queue.current.value.thread.id, api.inboxLimits()],
+      ).toStrictEqual(['b', [String(REFILL_PAGE)]]),
+    )
+    await queue.resolve({ kind: 'handled' })
+    await queue.resolve({ kind: 'handled' })
+
+    expect(queue.current.value?.thread.id).toBe('d')
   })
 })

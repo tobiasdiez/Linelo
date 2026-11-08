@@ -34,16 +34,23 @@ function formatSize(bytes: number): string {
       <div class="min-w-0 flex-1">
         <p class="font-semibold">{{ displayName(message.from) }}</p>
         <p class="text-xs text-muted">
-          {{ message.from.email }} · to {{ listNames([...message.to, ...message.cc]) }}
+          <template v-if="message.from.email">{{ message.from.email }} · </template>to
+          {{ listNames([...message.to, ...message.cc]) }}
         </p>
       </div>
       <MessageTime :datetime="message.sentAt" class="shrink-0 self-start text-xs text-muted" />
     </header>
 
+    <!-- `wrap-anywhere`: long links and other unbroken strings wrap instead of overflowing -->
     <div class="mt-5 space-y-3.5 text-toned">
-      <p v-for="(paragraph, index) in paragraphs" :key="index" class="whitespace-pre-line">
+      <p
+        v-for="(paragraph, index) in paragraphs"
+        :key="index"
+        class="whitespace-pre-line wrap-anywhere"
+      >
         {{ paragraph }}
       </p>
+      <p v-if="paragraphs.length === 0" class="text-muted">This message has no text.</p>
     </div>
 
     <ul

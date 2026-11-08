@@ -10,5 +10,8 @@ import ActionList from './ActionList.vue'
     <Story title="Busy">
       <ActionList class="max-w-96" busy />
     </Story>
+    <Story title="Waiting For Mark As Handled">
+      <ActionList class="max-w-96" busy pending="handled" />
+    </Story>
   </Stories>
 </template>

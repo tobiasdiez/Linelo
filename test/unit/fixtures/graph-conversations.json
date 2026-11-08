@@ -1,0 +1,196 @@
+{
+  "folder-deleteditems": {
+    "status": 200,
+    "body": {
+      "@odata.context": "https://graph.microsoft.com/v1.0/$metadata#users('me')/mailFolders(id)/$entity",
+      "id": "folder-deleted-items"
+    }
+  },
+  "folder-junkemail": {
+    "status": 200,
+    "body": {
+      "@odata.context": "https://graph.microsoft.com/v1.0/$metadata#users('me')/mailFolders(id)/$entity",
+      "id": "folder-junk"
+    }
+  },
+  "AAQkAGI2-conversation-vendor": {
+    "status": 200,
+    "body": {
+      "@odata.context": "https://graph.microsoft.com/v1.0/$metadata#users('me')/messages",
+      "value": [
+        {
+          "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0A-lena-3",
+          "conversationId": "AAQkAGI2-conversation-vendor",
+          "parentFolderId": "folder-inbox",
+          "subject": "RE: Vendor review: can we move sign-off to Thursday?",
+          "from": {
+            "emailAddress": { "name": "Lena Hartmann", "address": "lena.hartmann@northwind.co" }
+          },
+          "sender": {
+            "emailAddress": { "name": "Lena Hartmann", "address": "lena.hartmann@northwind.co" }
+          },
+          "toRecipients": [
+            {
+              "emailAddress": { "name": "Mara Lindqvist", "address": "mara.lindqvist@northwind.co" }
+            }
+          ],
+          "ccRecipients": [
+            { "emailAddress": { "name": "Priya Nair", "address": "priya.nair@northwind.co" } }
+          ],
+          "sentDateTime": "2026-10-12T09:42:51Z",
+          "receivedDateTime": "2026-10-12T09:43:00Z",
+          "isRead": false,
+          "isDraft": false,
+          "uniqueBody": {
+            "contentType": "text",
+            "content": "Hi Mara,\r\n\r\nDoes Thursday 14:00 work?\r\n\r\nLena"
+          },
+          "body": {
+            "contentType": "text",
+            "content": "Hi Mara,\r\n\r\nDoes Thursday 14:00 work?\r\n\r\nLena\r\n\r\nFrom: Mara Lindqvist\r\nSent: Sunday\r\n> Thanks Lena."
+          },
+          "attachments": [
+            {
+              "@odata.type": "#microsoft.graph.fileAttachment",
+              "id": "attachment-sheet",
+              "name": "cost-comparison.xlsx",
+              "size": 49152,
+              "isInline": false
+            },
+            {
+              "@odata.type": "#microsoft.graph.fileAttachment",
+              "id": "attachment-logo",
+              "name": "image001.png",
+              "size": 4096,
+              "isInline": true
+            }
+          ]
+        },
+        {
+          "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0A-draft",
+          "conversationId": "AAQkAGI2-conversation-vendor",
+          "parentFolderId": "folder-drafts",
+          "subject": "RE: Vendor review: can we move sign-off to Thursday?",
+          "from": {
+            "emailAddress": { "name": "Mara Lindqvist", "address": "mara.lindqvist@northwind.co" }
+          },
+          "toRecipients": [],
+          "ccRecipients": [],
+          "sentDateTime": null,
+          "receivedDateTime": "2026-10-12T09:50:00Z",
+          "isRead": true,
+          "isDraft": true,
+          "uniqueBody": { "contentType": "text", "content": "Half-written answer" },
+          "body": { "contentType": "text", "content": "Half-written answer" },
+          "attachments": []
+        },
+        {
+          "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0A-mara-1",
+          "conversationId": "AAQkAGI2-conversation-vendor",
+          "parentFolderId": "folder-sent-items",
+          "subject": "RE: Vendor review",
+          "from": {
+            "emailAddress": { "name": "Mara Lindqvist", "address": "mara.lindqvist@northwind.co" }
+          },
+          "toRecipients": [
+            { "emailAddress": { "name": "Lena Hartmann", "address": "lena.hartmann@northwind.co" } }
+          ],
+          "ccRecipients": [],
+          "sentDateTime": "2026-10-11T18:00:00Z",
+          "receivedDateTime": "2026-10-11T18:00:01Z",
+          "isRead": true,
+          "isDraft": false,
+          "uniqueBody": { "contentType": "text", "content": "Thanks Lena." },
+          "body": { "contentType": "text", "content": "Thanks Lena." },
+          "attachments": []
+        },
+        {
+          "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0A-lena-2",
+          "conversationId": "AAQkAGI2-conversation-vendor",
+          "parentFolderId": "folder-inbox",
+          "subject": "Vendor review",
+          "from": {
+            "emailAddress": { "name": "Lena Hartmann", "address": "lena.hartmann@northwind.co" }
+          },
+          "toRecipients": [
+            {
+              "emailAddress": { "name": "Mara Lindqvist", "address": "mara.lindqvist@northwind.co" }
+            }
+          ],
+          "ccRecipients": [],
+          "sentDateTime": "2026-10-11T16:19:58Z",
+          "receivedDateTime": "2026-10-11T16:20:00Z",
+          "isRead": false,
+          "isDraft": false,
+          "uniqueBody": { "contentType": "text", "content": "Starting the vendor review." },
+          "body": { "contentType": "text", "content": "Starting the vendor review." },
+          "attachments": []
+        },
+        {
+          "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0A-deleted",
+          "conversationId": "AAQkAGI2-conversation-vendor",
+          "parentFolderId": "folder-deleted-items",
+          "subject": "Vendor review",
+          "from": {
+            "emailAddress": { "name": "Priya Nair", "address": "priya.nair@northwind.co" }
+          },
+          "toRecipients": [
+            {
+              "emailAddress": { "name": "Mara Lindqvist", "address": "mara.lindqvist@northwind.co" }
+            }
+          ],
+          "ccRecipients": [],
+          "sentDateTime": "2026-10-11T17:00:00Z",
+          "receivedDateTime": "2026-10-11T17:00:00Z",
+          "isRead": true,
+          "isDraft": false,
+          "uniqueBody": { "contentType": "text", "content": "Deleted aside" },
+          "body": { "contentType": "text", "content": "Deleted aside" },
+          "attachments": []
+        }
+      ]
+    }
+  },
+  "AAQkAGI2-conversation-newsletter": {
+    "status": 200,
+    "body": {
+      "@odata.context": "https://graph.microsoft.com/v1.0/$metadata#users('me')/messages",
+      "value": [
+        {
+          "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0A-newsletter-1",
+          "conversationId": "AAQkAGI2-conversation-newsletter",
+          "parentFolderId": "folder-inbox",
+          "subject": "Issue 212: The quiet case for fewer meetings",
+          "from": {
+            "emailAddress": { "name": "Operator Weekly", "address": "hello@operatorweekly.com" }
+          },
+          "toRecipients": [
+            {
+              "emailAddress": { "name": "Mara Lindqvist", "address": "mara.lindqvist@northwind.co" }
+            }
+          ],
+          "ccRecipients": [],
+          "sentDateTime": "2026-10-12T07:59:00Z",
+          "receivedDateTime": "2026-10-12T08:00:00Z",
+          "isRead": false,
+          "isDraft": false,
+          "uniqueBody": { "contentType": "text", "content": "  " },
+          "body": {
+            "contentType": "text",
+            "content": "This week: fewer meetings.\r\n\r\nRead the full issue online."
+          },
+          "attachments": []
+        }
+      ]
+    }
+  },
+  "AAQkAGI2-conversation-staging": {
+    "status": 503,
+    "body": {
+      "error": {
+        "code": "ServiceUnavailable",
+        "message": "The service is temporarily unavailable."
+      }
+    }
+  }
+}

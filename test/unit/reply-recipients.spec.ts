@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vite-plus/test'
 import inboxBuilders from '~/data/inbox-builders'
 import replyAllRecipients from '#shared/utils/reply-all-recipients'
 
-const { currentUser: me, message, participant } = inboxBuilders
+const { mailboxOwner: me, message, participant } = inboxBuilders
 const lena = participant('Lena Hartmann')
 const priya = participant('Priya Nair')
 const marco = participant('Marco Bellini')

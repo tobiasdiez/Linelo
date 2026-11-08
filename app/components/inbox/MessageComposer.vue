@@ -48,8 +48,8 @@ function back(): void {
 
 // Both work while typing, which is where they are needed
 defineShortcuts({
-  escape: { usingInput: true, handler: ignoreRepeats(back) },
-  meta_enter: { usingInput: true, handler: ignoreRepeats(send) },
+  escape: { usingInput: true, handler: shortcut(back) },
+  meta_enter: { usingInput: true, handler: shortcut(send) },
 })
 
 // Open ready to edit or send: focused, with the caret at the end
@@ -131,7 +131,10 @@ onMounted(() => {
         </template>
       </UButton>
       <template #hint>
-        <p class="mt-2 text-center text-xs text-muted">Sending resolves this message.</p>
+        <!-- TODO: "Sending resolves this message." once replies are sent -->
+        <p class="mt-2 text-center text-xs text-muted">
+          Sending isn't available yet. Your draft stays here.
+        </p>
       </template>
     </RailActionBar>
   </div>

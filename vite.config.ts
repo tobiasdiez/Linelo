@@ -132,13 +132,17 @@ export default defineConfig({
           name: 'unit',
           include: ['test/unit/**/*.spec.ts'],
           environment: 'node',
+          // Database specs start PGlite and migrate it per test, which takes 5–8 s on CI runners
+          testTimeout: 30_000,
         },
       },
       () =>
         defineVitestProject({
-          // Vite's dependency scan misses these browser-spec imports, so pre-bundle them here.
+          // Vite's dependency scan misses these imports of the browser specs and the app, so pre-bundle them here.
           // Otherwise a cold cache (CI) re-optimizes mid-run and the tests see two copies of vitest ("Vitest failed to find the runner").
-          optimizeDeps: { include: ['@vue/test-utils', 'vite-plus/test/browser'] },
+          optimizeDeps: {
+            include: ['@vue/test-utils', 'better-auth/vue', 'vite-plus/test/browser'],
+          },
           test: {
             name: 'nuxt',
             include: ['test/nuxt/**/*.spec.ts'],
