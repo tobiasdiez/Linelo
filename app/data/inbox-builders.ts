@@ -1,5 +1,8 @@
-import createInboxFixtures from '~/data/inbox-fixtures'
-import currentUser from '~/data/current-user'
+import createInboxFixtures from '#shared/data/inbox-fixtures'
+import fixtureAccount from '#shared/data/fixture-account'
+import mailboxOwner from '#shared/data/mailbox-owner'
+import queueItemKey from '#shared/utils/queue-item-key'
+import signedInUser from '~/data/current-user'
 
 /** Fixed reference time, so stories and tests do not change from day to day. */
 const STORY_NOW = new Date('2026-10-12T10:30:00Z')
@@ -8,6 +11,7 @@ const storyItems = createInboxFixtures(STORY_NOW)
 
 interface QueueItemOverrides {
   id?: string
+  accountId?: string
   subject?: string
   messages?: [Inbox.Message, ...Inbox.Message[]]
   whyShown?: string
@@ -22,23 +26,26 @@ function message(overrides: Partial<Inbox.Message> = {}): Inbox.Message {
   return {
     id: 'message-1',
     from: participant('Lena Hartmann'),
-    to: [currentUser],
+    to: [mailboxOwner],
     cc: [],
     sentAt: STORY_NOW.toISOString(),
     body: 'Does Thursday work for the review call?',
     attachments: [],
+    unread: true,
     ...overrides,
   }
 }
 
 function queueItem({
   id = 'thread-1',
+  accountId = fixtureAccount.id,
   subject = 'Vendor review',
   messages = [message({ id: `${id}-message` })],
   whyShown = 'A direct ask with a deadline.',
   suggestions = [],
 }: QueueItemOverrides = {}): Inbox.QueueItem {
-  return { thread: { id, subject, messages }, whyShown, suggestions }
+  const thread = { id, accountId, subject, messages }
+  return { key: queueItemKey(thread), thread, whyShown, suggestions }
 }
 
 /** A queue item from the app fixtures, with timestamps relative to `STORY_NOW`. */
@@ -82,7 +89,9 @@ function storySuggestion<Kind extends Inbox.Suggestion['kind']>(
 /** Builders for inbox data, shared by stories and tests. */
 const inboxBuilders = {
   now: STORY_NOW,
-  currentUser,
+  mailboxOwner,
+  account: fixtureAccount,
+  signedInUser,
   participant,
   message,
   queueItem,

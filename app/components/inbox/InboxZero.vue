@@ -1,11 +1,5 @@
 <script setup lang="ts">
-// The title, focusable so the page can move focus here when the last message is resolved
-const FocusableTitle = defineComponent({
-  setup:
-    (_, { slots }) =>
-    () =>
-      h('h1', { tabindex: -1 }, slots.default?.()),
-})
+import FocusableTitle from '~/utils/focusable-title'
 </script>
 
 <template>

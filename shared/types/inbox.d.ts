@@ -1,5 +1,5 @@
 /**
- * Inbox domain types, shared by the app and (later) the server.
+ * Inbox domain types, shared by the app and the server.
  * Declared as a global namespace because the lint setup allows only default exports.
  */
 declare namespace Inbox {
@@ -23,15 +23,20 @@ declare namespace Inbox {
     sentAt: string
     /**
      * Plain text, paragraphs separated by blank lines.
-     * TODO: Microsoft Graph returns HTML bodies; revisit once ingestion lands.
+     * TODO: Render sanitized HTML bodies once that is its own feature.
      */
     body: string
     attachments: Attachment[]
+    /** Not read yet in the mailbox. Mark as handled marks exactly these as read. */
+    unread: boolean
   }
 
   /** A conversation, ordered oldest to newest. The last message is the one being decided. */
   interface Thread {
+    /** Opaque and unique across accounts. */
     id: string
+    /** The connected account the thread lives in, so actions reach the right mailbox. */
+    accountId: string
     subject: string
     messages: [Message, ...Message[]]
   }
@@ -67,6 +72,11 @@ declare namespace Inbox {
   type Suggestion = ReplySuggestion | HandledSuggestion | TaskSuggestion
 
   interface QueueItem {
+    /**
+     * Identifies the decision: the thread plus its latest unread message. New mail
+     * in a resolved thread gets a new key, so the thread can come back.
+     */
+    key: string
     thread: Thread
     /** One line explaining why this thread is shown now. */
     whyShown: string
@@ -86,16 +96,49 @@ declare namespace Inbox {
     | { kind: 'delegate'; to: Participant; note: string }
     | { kind: 'task'; task: TaskDraft }
 
+  /** A resolved item and the action that resolved it, so undo knows what to revert. */
+  interface Resolution {
+    item: QueueItem
+    kind: TerminalAction['kind']
+  }
+
   /** Plain, serializable queue state, so it can live in `useState`. */
   interface QueueState {
     /** Items still to decide, in the order they are shown. */
     pending: QueueItem[]
-    /** Resolved items, most recent last. Used for undo. */
-    resolved: QueueItem[]
+    /** Items resolved in this session, most recent last. Used for undo and to keep them out of refreshes. */
+    resolved: Resolution[]
   }
 
   interface ReplyRecipients {
     to: Participant[]
     cc: Participant[]
+  }
+
+  /** A connected account whose mailbox feeds the inbox. */
+  interface MailAccount {
+    id: string
+    /** The provider id, for example `microsoft`. */
+    provider: string
+    address: Participant
+  }
+
+  /** `GET /api/inbox` */
+  interface InboxResponse {
+    /** Newest unread first. */
+    items: QueueItem[]
+  }
+
+  /** `GET /api/me`: the signed-in user and their mail accounts; `user: null` when signed out. */
+  interface MeResponse {
+    user: { name: string; email: string } | null
+    accounts: MailAccount[]
+  }
+
+  /** `POST /api/mail/read` */
+  interface ReadStateRequest {
+    accountId: string
+    messageIds: string[]
+    read: boolean
   }
 }

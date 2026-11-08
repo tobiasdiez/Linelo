@@ -12,6 +12,22 @@ import { UAlert } from '#components'
       />
     </Story>
 
+    <Story title="Neutral">
+      <UAlert
+        color="neutral"
+        title="Account"
+        description="Sign in again so Linelo can keep reading your mail."
+      />
+    </Story>
+
+    <Story title="Warning">
+      <UAlert
+        color="warning"
+        title="Approval"
+        description="Your organisation needs to approve Linelo first. Your IT admin can do that."
+      />
+    </Story>
+
     <Story title="Error">
       <UAlert
         color="error"

@@ -136,9 +136,11 @@ export default defineConfig({
       },
       () =>
         defineVitestProject({
-          // Vite's dependency scan misses these browser-spec imports, so pre-bundle them here.
+          // Vite's dependency scan misses these imports of the browser specs and the app, so pre-bundle them here.
           // Otherwise a cold cache (CI) re-optimizes mid-run and the tests see two copies of vitest ("Vitest failed to find the runner").
-          optimizeDeps: { include: ['@vue/test-utils', 'vite-plus/test/browser'] },
+          optimizeDeps: {
+            include: ['@vue/test-utils', 'better-auth/vue', 'vite-plus/test/browser'],
+          },
           test: {
             name: 'nuxt',
             include: ['test/nuxt/**/*.spec.ts'],

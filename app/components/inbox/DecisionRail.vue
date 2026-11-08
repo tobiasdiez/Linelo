@@ -14,6 +14,8 @@ type InstantChoice =
   | Pick<Inbox.TaskSuggestion, 'kind' | 'task'>
 
 const MAX_SUGGESTIONS = 3
+/** Waits shorter than this show no spinner, so quick answers do not flicker. */
+const PENDING_DELAY_MS = 300
 
 const { item, busy = false } = defineProps<{
   item: Inbox.QueueItem
@@ -32,7 +34,7 @@ const mode = defineModel<RailMode>('mode', { default: 'decide' })
 /** The reply suggestion the composer started from; empty for a manual reply. */
 const chosenSuggestionId = defineModel<string | undefined>('chosenSuggestionId')
 
-const { me } = useCurrentUser()
+const { mailboxOf } = useCurrentUser()
 const replyingHeadingId = useId()
 const suggestionList = useTemplateRef<InstanceType<typeof SuggestionList>>('suggestionList')
 const actionList = useTemplateRef<InstanceType<typeof ActionList>>('actionList')
@@ -51,7 +53,29 @@ const chosenPosition = computed(
   () => suggestions.value.findIndex(entry => entry.id === chosenReply.value?.id) + 1,
 )
 const { draft, addFollowUp } = useReplyDrafts(chosenReply)
-const recipients = computed(() => replyAllRecipients(latestMessage(item.thread), me.value))
+// Reply from the mailbox the thread lives in
+const recipients = computed(() =>
+  replyAllRecipients(latestMessage(item.thread), mailboxOf(item.thread.accountId)),
+)
+
+/** The control that started the action in flight, shown with a spinner once the wait is noticeable. */
+const pressed = shallowRef<{ action?: Inbox.TerminalAction['kind']; suggestionId?: string }>({})
+const showPending = ref(false)
+const pendingTimer: { id?: ReturnType<typeof setTimeout> } = {}
+
+watch(
+  () => busy,
+  isBusy => {
+    clearTimeout(pendingTimer.id)
+    showPending.value = false
+    if (isBusy) {
+      pendingTimer.id = setTimeout(() => {
+        showPending.value = true
+      }, PENDING_DELAY_MS)
+    }
+  },
+)
+onBeforeUnmount(() => clearTimeout(pendingTimer.id))
 
 function toAction(choice: InstantChoice): Inbox.TerminalAction {
   return choice.kind === 'task' ? { kind: 'task', task: choice.task } : { kind: 'handled' }
@@ -66,11 +90,13 @@ function choose(suggestion: Inbox.Suggestion): void {
   if (suggestion.kind === 'reply') {
     openReply(suggestion)
   } else {
+    pressed.value = { suggestionId: suggestion.id }
     emit('resolve', toAction(suggestion))
   }
 }
 
 function act(kind: Inbox.TerminalAction['kind']): void {
+  pressed.value = { action: kind }
   switch (kind) {
     case 'reply': {
       openReply()
@@ -121,8 +147,8 @@ watch(
 )
 
 /*
- * Disabling the focused button while an action is in flight drops focus. If the
- * action fails, the item stays, and focus goes back to where it was.
+ * The actions stay focusable while busy, but the composer's buttons are disabled,
+ * which drops focus. If the action fails, the item stays, and focus goes back.
  */
 const focusBeforeBusy = shallowRef<HTMLElement>()
 watch(
@@ -145,19 +171,27 @@ watch(
 </script>
 
 <template>
-  <aside aria-label="Decide" class="flex flex-col gap-5 lg:sticky lg:top-4">
+  <aside aria-label="Decide" :aria-busy="busy" class="flex flex-col gap-5 lg:sticky lg:top-4">
     <template v-if="mode === 'decide'">
-      <!-- Room for three suggestions, so the actions keep their place from one message to the next -->
-      <div class="lg:min-h-76">
+      <!--
+        Room for three suggestions, so the actions keep their place from one message to the next.
+        Without suggestions (mail is not ranked yet) the actions move up instead of leaving a gap.
+      -->
+      <div v-if="suggestions.length > 0" class="lg:min-h-76">
         <SuggestionList
-          v-if="suggestions.length > 0"
           ref="suggestionList"
           :suggestions="suggestions"
           :busy="busy"
+          :pending="showPending ? pressed.suggestionId : undefined"
           @choose="choose"
         />
       </div>
-      <ActionList ref="actionList" :busy="busy" @action="act" />
+      <ActionList
+        ref="actionList"
+        :busy="busy"
+        :pending="showPending ? pressed.action : undefined"
+        @action="act"
+      />
     </template>
 
     <template v-else>

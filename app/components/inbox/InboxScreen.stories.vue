@@ -4,6 +4,12 @@ import inboxBuilders from '~/data/inbox-builders'
 
 const longThread = inboxBuilders.storyItem('thread-migration-plan')
 const vendorReview = inboxBuilders.storyItem('thread-vendor-review')
+// Mail from the mailbox has no suggestions until ranking exists
+const unranked = {
+  ...inboxBuilders.storyItem('thread-offsite-venue'),
+  whyShown: 'Unread and sent to you directly. Newest mail comes first.',
+  suggestions: [],
+}
 </script>
 
 <template>
@@ -13,6 +19,9 @@ const vendorReview = inboxBuilders.storyItem('thread-vendor-review')
     </Story>
     <Story title="Direct Ask">
       <InboxScreen :item="vendorReview" />
+    </Story>
+    <Story title="Unranked Mail">
+      <InboxScreen :item="unranked" />
     </Story>
   </Stories>
 </template>

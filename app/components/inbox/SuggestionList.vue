@@ -7,10 +7,16 @@ interface Focusable {
   focus: () => void
 }
 
-const { suggestions, busy = false } = defineProps<{
+const {
+  suggestions,
+  busy = false,
+  pending = undefined,
+} = defineProps<{
   suggestions: Inbox.Suggestion[]
-  /** Disables the suggestions, and their number keys, while an action is being carried out. */
+  /** Blocks the suggestions, and their number keys, while an action is being carried out. */
   busy?: boolean
+  /** The id of the suggestion being carried out, shown with a spinner. */
+  pending?: string
 }>()
 
 const emit = defineEmits<{
@@ -42,17 +48,21 @@ function focusSuggestion(id: string): void {
   cards.get(id)?.focus()
 }
 
-// Keys 1 to 3 pick the suggestion at that position
+function choose(suggestion: Inbox.Suggestion): void {
+  if (!busy) {
+    emit('choose', suggestion)
+  }
+}
+
+// Keys 1 to 3 pick the suggestion at that position; `choose` ignores them while busy
 defineShortcuts(
   computed(() =>
-    busy
-      ? {}
-      : Object.fromEntries(
-          suggestions.map((suggestion, index) => [
-            String(index + 1),
-            ignoreRepeats(() => emit('choose', suggestion)),
-          ]),
-        ),
+    Object.fromEntries(
+      suggestions.map((suggestion, index) => [
+        String(index + 1),
+        shortcut(() => choose(suggestion)),
+      ]),
+    ),
   ),
 )
 
@@ -69,7 +79,8 @@ defineExpose({ focusSuggestion })
           :suggestion="suggestion"
           :position="index + 1"
           :disabled="busy"
-          @click="emit('choose', suggestion)"
+          :pending="pending === suggestion.id"
+          @click="choose(suggestion)"
         />
       </li>
     </ul>

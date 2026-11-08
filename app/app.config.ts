@@ -17,6 +17,16 @@ export default defineAppConfig({
           },
         },
         {
+          // Calm information, such as asking to sign in again
+          color: 'neutral',
+          variant: 'subtle',
+          class: {
+            root: 'border-default bg-muted',
+            title: 'text-highlighted',
+            description: 'text-toned',
+          },
+        },
+        {
           color: 'warning',
           variant: 'subtle',
           class: {
