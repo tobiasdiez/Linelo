@@ -31,6 +31,8 @@ const users = pgTable('users', {
   displayName: text().notNull(),
   emailVerified: boolean().notNull().default(false),
   image: text(),
+  /** When the last full reconcile of calendar copies ran (`server/calendar/sync.ts`), to throttle it. */
+  calendarSyncedAt: timestamp({ withTimezone: true }),
   ...timestamps(),
 })
 
@@ -97,4 +99,60 @@ const verifications = pgTable(
   table => [index().on(table.identifier)],
 )
 
-export { users, sessions, accounts, verifications }
+/**
+ * Calendars the user chose to be offered events from (`server/calendar/sources.ts`).
+ * A source is read through the reader of its `kind` (`server/calendar/readers.ts`).
+ */
+const calendarSources = pgTable(
+  'calendar_sources',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    userId: uuid()
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** `outlook`: a calendar in the account's own calendar list. Later kinds (group, ICS) get a reader each. */
+    kind: text().notNull(),
+    /** The account that reads it; null for kinds that need none. */
+    accountId: uuid().references(() => accounts.id, { onDelete: 'cascade' }),
+    /** The provider's id for the calendar. */
+    externalId: text().notNull(),
+    /** Cached from the provider, refreshed whenever the calendar list is fetched. */
+    name: text().notNull(),
+    /** Soft removal: the decisions stay, so adding the calendar again offers nothing twice. */
+    removedAt: timestamp({ withTimezone: true }),
+    ...timestamps(),
+  },
+  table => [unique().on(table.userId, table.kind, table.externalId), index().on(table.userId)],
+)
+
+/**
+ * What the user decided about an event of a source, one row per source event or
+ * series (`server/calendar/decisions.ts`). No event content is stored, only ids and versions.
+ */
+const calendarDecisions = pgTable(
+  'calendar_decisions',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    userId: uuid()
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    sourceId: uuid()
+      .notNull()
+      .references(() => calendarSources.id, { onDelete: 'cascade' }),
+    /** The reader's id of the event; for a series, its master's. */
+    sourceEventId: text().notNull(),
+    decision: text({ enum: ['accepted', 'dismissed'] }).notNull(),
+    /** The copy in the main calendar, filled once the provider created it. */
+    copyEventId: text(),
+    /** The source's version at the last sync (Graph's changeKey). */
+    sourceVersion: text(),
+    /** The copy's version after Linelo's last full write; differs once the user edited the copy. */
+    copyVersion: text(),
+    /** When a single source event ends (past ones are not synced); null for a series. */
+    sourceEnd: timestamp({ withTimezone: true }),
+    ...timestamps(),
+  },
+  table => [unique().on(table.sourceId, table.sourceEventId), index().on(table.userId)],
+)
+
+export { users, sessions, accounts, verifications, calendarSources, calendarDecisions }

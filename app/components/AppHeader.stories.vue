@@ -10,7 +10,7 @@ import AppHeader from './AppHeader.vue'
       </div>
     </Story>
     <Story title="Account Menu Open">
-      <div class="min-h-48">
+      <div class="min-h-56">
         <AppHeader menu-open />
       </div>
     </Story>

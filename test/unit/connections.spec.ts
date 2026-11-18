@@ -1,10 +1,13 @@
 import * as schema from '#server/db/schema'
 import { describe, expect, it, vi } from 'vite-plus/test'
-import loadMailboxes from '#server/mail/connections'
+import calendarFakes from './calendar-fakes'
+import connections from '#server/mail/connections'
 import mailFakes from './mail-fakes'
 import testDatabase from './test-database'
 
 type Account = typeof schema.accounts.$inferInsert
+
+const { loadMailboxes, loadCalendarAccounts } = connections
 
 /** A database with Mara, her accounts as given, and another user's mailbox. */
 async function setup(accountsOf: (userId: string) => Account[]) {
@@ -94,5 +97,31 @@ describe('mail connections', () => {
       [account, { force: false }],
       [account, { force: true }],
     ])
+  })
+
+  it('lists every account with a calendar adapter, whatever scopes were stored', async () => {
+    expect.hasAssertions()
+    const { dependencies, userId } = await setup(id => [
+      // Consented to calendar access after its scopes were stored, which Better Auth does not rewrite
+      { userId: id, providerId: 'microsoft', accountId: 'mara', scope: 'openid,Mail.ReadWrite' },
+      { userId: id, providerId: 'todoist', accountId: 'mara-tasks', scope: 'data:read' },
+    ])
+    const calendar = calendarFakes.fakeProvider().provider
+
+    const accounts = await loadCalendarAccounts(
+      { ...dependencies, providers: { microsoft: calendar } },
+      userId,
+    )
+
+    expect(
+      accounts.map(({ providerId, provider, connection }) => [
+        providerId,
+        provider,
+        connection.account.address,
+      ]),
+    ).toStrictEqual([
+      ['microsoft', calendar, { name: 'Mara Lindqvist', email: 'mara@northwind.co' }],
+    ])
+    await expect(accounts[0]?.connection.accessToken()).resolves.toBe('stored')
   })
 })

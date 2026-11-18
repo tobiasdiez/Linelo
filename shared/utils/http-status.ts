@@ -10,11 +10,13 @@ function isSuccess(status: number): boolean {
 /** The HTTP status codes Linelo checks, by name. */
 const httpStatus = {
   ok: OK,
+  created: 201,
   noContent: 204,
   badRequest: 400,
   unauthorized: 401,
   forbidden: 403,
   notFound: 404,
+  conflict: 409,
   tooManyRequests: 429,
   internalServerError: 500,
   serviceUnavailable: 503,

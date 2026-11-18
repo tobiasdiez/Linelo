@@ -1,11 +1,8 @@
+import isNonEmptyString from '#shared/utils/is-non-empty-string'
 import isRecord from '#shared/utils/is-record'
 
 /** More than any thread shows at once; keeps a single request bounded. */
 const MAX_MESSAGES = 100
-
-function isNonEmptyString(value: unknown): value is string {
-  return typeof value === 'string' && value.length > 0
-}
 
 /** Guards the body of `POST /api/mail/read`. */
 function isRequest(value: unknown): value is Inbox.ReadStateRequest {

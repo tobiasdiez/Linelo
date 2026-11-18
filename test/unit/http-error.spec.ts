@@ -28,7 +28,7 @@ describe('mail errors over HTTP', () => {
   it('reports an unavailable mailbox as 503, which keeps the user where they are', () => {
     const error = httpErrorOf(new MailError('unavailable', 'Graph is down'))
 
-    expect(error).toStrictEqual({ statusCode: 503, statusMessage: 'Mailbox unavailable' })
+    expect(error).toStrictEqual({ statusCode: 503, statusMessage: 'Provider unavailable' })
     expect(signInReason(asReceived(error))).toBeUndefined()
   })
 
@@ -36,5 +36,16 @@ describe('mail errors over HTTP', () => {
     expect(
       signInReason({ statusCode: 401, data: { statusCode: 401, statusMessage: 'Not signed in' } }),
     ).toBe('expired')
+  })
+
+  it('reports a missing permission as 403 with reason consent, which is not a sign-in', () => {
+    const error = httpErrorOf(new MailError('consent', 'Calendars.ReadWrite missing'))
+
+    expect(error).toStrictEqual({
+      statusCode: 403,
+      statusMessage: 'Permission missing',
+      data: { reason: 'consent' },
+    })
+    expect(signInReason(asReceived(error))).toBeUndefined()
   })
 })

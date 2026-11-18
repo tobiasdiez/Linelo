@@ -10,11 +10,12 @@ export default defineNuxtConfig({
   css: ['~/assets/css/main.css'],
   devtools: { enabled: true },
   modules: ['@nuxt/ui'],
-  // Pages and API answers carry mail: the browser keeps no copy, so Back after signing out shows nothing.
+  // Pages and API answers carry mail and calendars: the browser keeps no copy, so Back after signing out shows nothing.
   // Static assets under `/_nuxt` keep their own caching.
   routeRules: {
     '/': { headers: { 'cache-control': 'private, no-store' } },
     '/sign-in': { headers: { 'cache-control': 'private, no-store' } },
+    '/calendar': { headers: { 'cache-control': 'private, no-store' } },
     '/api/**': { headers: { 'cache-control': 'private, no-store' } },
   },
   typescript: {
