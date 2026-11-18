@@ -20,22 +20,23 @@ To try the app without a Microsoft account, open [localhost:3000/api/auth/demo/s
 
 ## Sign-in with Microsoft
 
-Linelo signs people in with their Microsoft account and reads their Outlook inbox through Microsoft Graph. Sign-in, sessions and the stored tokens are handled by [Better Auth](https://better-auth.com), inside the app on its own database; OAuth tokens are encrypted at rest.
+Linelo signs people in with their Microsoft account, reads their Outlook inbox and sends their replies and forwards through Microsoft Graph. Sign-in, sessions and the stored tokens are handled by [Better Auth](https://better-auth.com), inside the app on its own database; OAuth tokens are encrypted at rest.
 
 To sign in with a real account, register an app in [Microsoft Entra](https://entra.microsoft.com) (App registrations, New registration):
 
 - Supported account types: _Accounts in any organizational directory and personal Microsoft accounts_.
 - Redirect URI: platform _Web_, `http://localhost:3000/api/auth/callback/microsoft` (plus `https://<your-domain>/api/auth/callback/microsoft` for a deployment). Redirect URIs cannot contain wildcards, so preview deployments cannot sign in until they get a fixed URI of their own.
-- API permissions: Microsoft Graph, delegated, as in the table below. Linelo never sends mail on its own.
+- API permissions: Microsoft Graph, delegated, as in the table below. Linelo never sends mail on its own: only the replies and forwards you write, when you press Send or Forward.
 - Certificates & secrets: create a client secret. It expires after at most 24 months; put a reminder in the calendar and rotate it before then.
 
 | Permission                                                  | Why                                                                                                                          |
 | ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
 | `openid`, `profile`, `email`, `offline_access`, `User.Read` | Sign-in, and a refresh token so Linelo keeps working without asking again.                                                   |
 | `Mail.ReadWrite`                                            | The smallest permission that can mark mail as read.                                                                          |
+| `Mail.Send`                                                 | Sends the replies and forwards you write, and nothing else.                                                                  |
 | `Calendars.ReadWrite`                                       | Shows the main calendar, reads the other calendars in the account's calendar list, and writes the copies of accepted events. |
 
-Microsoft asks for all of them at once at sign-in. An account that signed in before a permission was added is asked to sign in again on its next token refresh, and Microsoft's consent screen then lists what is new.
+Microsoft asks for all of them at once at sign-in. An account that signed in before `Calendars.ReadWrite` was added is asked to sign in again on its next token refresh, and Microsoft's consent screen then lists what is new. The mail permissions are checked against what the account granted when it was created (Better Auth does not rewrite the stored scopes on a repeat sign-in), so an account from before `Mail.Send` has to be removed and signed in afresh.
 
 Then set, in `.env` and `.env.production`:
 

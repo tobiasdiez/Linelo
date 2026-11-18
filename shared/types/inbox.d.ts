@@ -17,6 +17,11 @@ declare namespace Inbox {
   interface Message {
     id: string
     from: Participant
+    /**
+     * Where replies go instead of `from`, when set (contact forms, ticketing systems
+     * and mailing lists send from a no-reply address). Empty for most mail.
+     */
+    replyTo: Participant[]
     to: Participant[]
     cc: Participant[]
     /** ISO 8601 timestamp. */
@@ -141,4 +146,41 @@ declare namespace Inbox {
     messageIds: string[]
     read: boolean
   }
+
+  /** A request body as the server validated it: the request, or the first field that does not fit. */
+  type Validated<Request> =
+    | { value: Request; field?: undefined }
+    | { value?: undefined; field: string }
+
+  /** What a reply and a forward have in common: the message acted on, and what to mark as read. */
+  interface MessageActionRequest {
+    accountId: string
+    /** The message acted on: the latest unread one of the thread. */
+    messageId: string
+    /** The thread's unread messages, marked as read once the mail is sent. */
+    markAsRead: string[]
+  }
+
+  /** `POST /api/mail/reply` */
+  interface ReplyRequest extends MessageActionRequest {
+    /** Plain text, paragraphs separated by blank lines. */
+    body: string
+    to: Participant[]
+    cc: Participant[]
+  }
+
+  /** `POST /api/mail/forward` */
+  interface ForwardRequest extends MessageActionRequest {
+    /** Exactly one recipient for now; a list, so several can follow without a new shape. */
+    to: Participant[]
+    /** Plain text; may be empty. */
+    note: string
+  }
+
+  /**
+   * Why an API call failed, when the server says (`data.reason`): Linelo lost access
+   * to the mailbox, the account did not grant a permission the call needs, or the
+   * mailbox did not confirm a send (`server/mail/http-error.ts`).
+   */
+  type ApiErrorReason = 'reconnect' | 'consent' | 'uncertain'
 }

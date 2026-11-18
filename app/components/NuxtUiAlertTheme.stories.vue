@@ -16,7 +16,7 @@ import { UAlert } from '#components'
       <UAlert
         color="neutral"
         title="Account"
-        description="Sign in again so Linelo can keep reading your mail."
+        description="Sign in again so Linelo can keep working with your mail."
       />
     </Story>
 

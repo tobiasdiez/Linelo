@@ -4,15 +4,28 @@ import { registerEndpoint } from '@nuxt/test-utils/runtime'
 
 type Answer<Body> = () => Body | Response | Promise<Body | Response>
 
+/** What a fake mail endpoint answers: 204 unless replaced. */
+interface MailEndpoint {
+  answer: Answer<Response>
+}
+
 interface FakeInboxApi {
   /** Answers `GET /api/me`, which the auth middleware asks when no user is known yet. */
   me: { answer: () => Inbox.MeResponse | Response }
   /** Answers `GET /api/inbox`; the queue's background refills ask it too. */
   inbox: { answer: Answer<Inbox.QueueItem[]> }
-  /** Answers `POST /api/mail/read`: 204 unless replaced. */
-  read: { answer: () => Response }
+  /** Answers `POST /api/mail/read`. */
+  read: MailEndpoint
+  /** Answers `POST /api/mail/reply`. */
+  reply: MailEndpoint
+  /** Answers `POST /api/mail/forward`. */
+  forward: MailEndpoint
   /** The bodies posted to `/api/mail/read`, in order. */
-  posts: () => unknown[]
+  readPosts: () => unknown[]
+  /** The bodies posted to `/api/mail/reply`, in order. */
+  replyPosts: () => unknown[]
+  /** The bodies posted to `/api/mail/forward`, in order. */
+  forwardPosts: () => unknown[]
   /** The `limit` of each inbox request, in order. */
   inboxLimits: () => (string | null)[]
   /** Lets inbox requests still in flight (background refills) land, so they cannot reach the next test, then removes the fake. */
@@ -25,7 +38,7 @@ function reconnectResponse(): Response {
     {
       statusCode: httpStatus.unauthorized,
       statusMessage: 'Sign in again',
-      data: { reason: 'reconnect' },
+      data: { reason: 'reconnect' satisfies Inbox.ApiErrorReason },
     },
     { status: httpStatus.unauthorized },
   )
@@ -51,16 +64,50 @@ function unavailableResponse(): Response {
   return new Response(undefined, { status: httpStatus.serviceUnavailable })
 }
 
+/** The answer of the API when the mailbox did not confirm a send: it may have gone out. */
+function uncertainResponse(): Response {
+  return Response.json(
+    {
+      statusCode: httpStatus.gatewayTimeout,
+      statusMessage: 'Not confirmed by the mailbox',
+      data: { reason: 'uncertain' satisfies Inbox.ApiErrorReason },
+    },
+    { status: httpStatus.gatewayTimeout },
+  )
+}
+
+/** The answer of the API when the action went through. */
+function noContent(): Response {
+  return new Response(undefined, { status: httpStatus.noContent })
+}
+
+/** A fake `POST` mail endpoint at `path` that records what was posted to it. */
+function recordedEndpoint(path: string) {
+  const posts: unknown[] = []
+  const endpoint: MailEndpoint = { answer: noContent }
+  const unregister = registerEndpoint(path, {
+    method: 'POST',
+    handler: async event => {
+      const body: unknown = await event.web?.request?.json()
+      posts.push(body)
+      return endpoint.answer()
+    },
+  })
+  return { endpoint, posts: () => [...posts], unregister }
+}
+
 /**
- * Stands in for the inbox API: the server's list of unread items and the read
- * state endpoint, recording what the app sent.
+ * Stands in for the inbox API: the server's list of unread items and the mail
+ * endpoints (read state, reply, forward), recording what the app sent.
  */
 function fakeInboxApi(items: Inbox.QueueItem[]): FakeInboxApi {
-  const posts: unknown[] = []
+  const read = recordedEndpoint('/api/mail/read')
+  const reply = recordedEndpoint('/api/mail/reply')
+  const forward = recordedEndpoint('/api/mail/forward')
   const inboxLimits: (string | null)[] = []
   const inFlight = new Set<Promise<unknown>>()
   const { account, signedInUser } = inboxBuilders
-  const api: Pick<FakeInboxApi, 'me' | 'inbox' | 'read'> = {
+  const api: Pick<FakeInboxApi, 'me' | 'inbox'> = {
     me: {
       answer: () => ({
         user: { name: signedInUser.name, email: signedInUser.email },
@@ -68,7 +115,6 @@ function fakeInboxApi(items: Inbox.QueueItem[]): FakeInboxApi {
       }),
     },
     inbox: { answer: () => items },
-    read: { answer: () => new Response(undefined, { status: httpStatus.noContent }) },
   }
   const unregister = [
     registerEndpoint('/api/me', () => api.me.answer()),
@@ -79,19 +125,19 @@ function fakeInboxApi(items: Inbox.QueueItem[]): FakeInboxApi {
       const answer = await answering
       return answer instanceof Response ? answer : { items: answer }
     }),
-    registerEndpoint('/api/mail/read', {
-      method: 'POST',
-      handler: async event => {
-        const body: unknown = await event.web?.request?.json()
-        posts.push(body)
-        return api.read.answer()
-      },
-    }),
+    read.unregister,
+    reply.unregister,
+    forward.unregister,
   ]
 
   return {
     ...api,
-    posts: () => [...posts],
+    read: read.endpoint,
+    reply: reply.endpoint,
+    forward: forward.endpoint,
+    readPosts: read.posts,
+    replyPosts: reply.posts,
+    forwardPosts: forward.posts,
     inboxLimits: () => [...inboxLimits],
     restore: async () => {
       await Promise.allSettled(inFlight)
@@ -108,10 +154,12 @@ function fakeInboxApi(items: Inbox.QueueItem[]): FakeInboxApi {
 
 const fakeInbox = {
   api: fakeInboxApi,
+  noContent,
   reconnectResponse,
   signedOutResponse,
   signedOutMe,
   unavailableResponse,
+  uncertainResponse,
 }
 
 export default fakeInbox

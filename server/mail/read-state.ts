@@ -1,38 +1,24 @@
-import isNonEmptyString from '#shared/utils/is-non-empty-string'
-import isRecord from '#shared/utils/is-record'
+import guards from '#shared/utils/guards'
+import mailboxLookup from './mailbox-lookup'
 
-/** More than any thread shows at once; keeps a single request bounded. */
-const MAX_MESSAGES = 100
-
-/** Guards the body of `POST /api/mail/read`. */
-function isRequest(value: unknown): value is Inbox.ReadStateRequest {
-  return (
-    isRecord(value) &&
-    isNonEmptyString(value.accountId) &&
-    typeof value.read === 'boolean' &&
-    Array.isArray(value.messageIds) &&
-    value.messageIds.length > 0 &&
-    value.messageIds.length <= MAX_MESSAGES &&
-    value.messageIds.every(id => isNonEmptyString(id))
-  )
+/** Validates the body of `POST /api/mail/read`. */
+function validate(body: unknown): Inbox.Validated<Inbox.ReadStateRequest> {
+  return guards.validate<Inbox.ReadStateRequest>(body, {
+    accountId: guards.nonEmptyString,
+    messageIds: guards.messageIds({ min: 1 }),
+    read: guards.boolean,
+  })
 }
 
-/**
- * Marks the messages read or unread in the mailbox they live in. Resolves to
- * `false` when the account is not one of the user's mailboxes.
- */
+/** Marks the messages read or unread in the mailbox they live in (see `mailboxLookup.findMailbox`). */
 async function apply(
   mailboxes: readonly Mail.Mailbox[],
   { accountId, messageIds, read }: Inbox.ReadStateRequest,
-): Promise<boolean> {
-  const mailbox = mailboxes.find(({ connection }) => connection.account.id === accountId)
-  if (!mailbox) {
-    return false
-  }
-  await mailbox.provider.setRead(mailbox.connection, messageIds, read)
-  return true
+): Promise<void> {
+  const { provider, connection } = mailboxLookup.findMailbox(mailboxes, accountId)
+  await provider.setRead(connection, messageIds, read)
 }
 
-const readState = { isRequest, apply }
+const readState = { validate, apply }
 
 export default readState

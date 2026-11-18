@@ -19,10 +19,21 @@ declare namespace Graph {
     body: unknown
   }
 
-  /** Graph's answer: the status, and the parsed body of a successful one (`undefined` when it has none, as a 204). */
+  /**
+   * Graph's answer: the status; the parsed body of a success (`undefined` when it has
+   * none, as a 204) or of a refusal (Graph's error); and Graph's id of the request, for its support.
+   */
   interface Answer {
     status: number
     body: unknown
+    requestId: string | undefined
+  }
+
+  /** What Graph said when it refused: its error code and message, as far as given, and its id of the request. */
+  interface Refusal {
+    code: string | undefined
+    message: string | undefined
+    requestId: string | undefined
   }
 
   interface RequestInit {
@@ -30,7 +41,12 @@ declare namespace Graph {
     headers?: Record<string, string>
     body?: unknown
     /** What `request` and `list` throw for a status other than a success; `unavailable` unless given. */
-    failure?: (status: number) => Error
+    failure?: (status: number, refusal: Refusal) => Error
+    /**
+     * The request sends mail: no answer (or none in time) means the mail may be out
+     * (`uncertain`, not `unavailable`), and the body of a success is not read.
+     */
+    sendsMail?: boolean
   }
 
   /** Who a Graph call is for: the mailbox, and the token to call with. */
@@ -45,7 +61,7 @@ declare namespace Graph {
      * `providerAuth.UnauthorizedError`, no answer `unavailable`; every other status is the caller's to judge.
      */
     send: (caller: Caller, path: string, init?: RequestInit) => Promise<Answer>
-    /** `send`, with anything but a success reported as `unavailable`. Resolves to the body. */
+    /** `send`, with anything but a success reported as `unavailable` (or as `failure` says). Resolves to the body. */
     request: (caller: Caller, path: string, init?: RequestInit) => Promise<unknown>
     /**
      * Runs the requests in batches of 20, one batch at a time. Graph answers 200 even

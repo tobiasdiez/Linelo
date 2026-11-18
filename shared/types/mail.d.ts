@@ -6,10 +6,14 @@
  */
 declare namespace Mail {
   /**
-   * Why a provider call failed: the provider no longer accepts our credentials, it is
-   * not reachable right now, or the account did not grant a permission the call needs (`consent`).
+   * Why a provider call failed: the provider no longer accepts our credentials, the
+   * account did not grant a permission the call needs (`consent`), it is not reachable
+   * right now, or (`uncertain`) it may have sent the mail but did not confirm it.
    */
-  type ErrorKind = 'reconnect' | 'unavailable' | 'consent'
+  type ProviderErrorKind = 'reconnect' | 'consent' | 'unavailable' | 'uncertain'
+
+  /** Why a mail call failed: as a provider says, or (`unknownAccount`) the account is not one of the user's mailboxes. */
+  type ErrorKind = ProviderErrorKind | 'unknownAccount'
 
   interface Connection {
     account: { id: string; address: Inbox.Participant }
@@ -23,6 +27,12 @@ declare namespace Mail {
    */
   type Thread = Omit<Inbox.Thread, 'accountId'>
 
+  /** A reply as the provider sends it: the request without what only the server needs. */
+  type OutgoingReply = Omit<Inbox.ReplyRequest, 'accountId' | 'markAsRead'>
+
+  /** A forward as the provider sends it. */
+  type OutgoingForward = Omit<Inbox.ForwardRequest, 'accountId' | 'markAsRead'>
+
   interface Provider {
     /**
      * The scopes an account of this provider needs on top of sign-in to be a mailbox,
@@ -33,6 +43,15 @@ declare namespace Mail {
     listUnreadThreads: (connection: Connection, options: { limit: number }) => Promise<Thread[]>
     /** Marks messages read or unread. */
     setRead: (connection: Connection, messageIds: readonly string[], read: boolean) => Promise<void>
+    /**
+     * Sends a reply to the message, to exactly these recipients; the mailbox keeps a
+     * copy in Sent Items. Rejects with a `MailError` of a `ProviderErrorKind`: `unavailable` only when nothing
+     * was sent, `uncertain` when it may have been, `reconnect` when the credentials or
+     * the permission to send are missing.
+     */
+    reply: (connection: Connection, reply: OutgoingReply) => Promise<void>
+    /** Forwards the message, attachments included, with the note above it. Rejects as `reply` does. */
+    forward: (connection: Connection, forward: OutgoingForward) => Promise<void>
   }
 
   /** A connected mail account with the adapter of its provider. */

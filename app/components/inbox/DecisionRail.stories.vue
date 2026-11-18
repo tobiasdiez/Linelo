@@ -37,5 +37,8 @@ const unranked = { ...vendorReview, suggestions: [] }
     <Story title="Manual Reply">
       <DecisionRail class="max-w-96" :item="offsite" mode="reply" />
     </Story>
+    <Story title="Forward">
+      <DecisionRail class="max-w-96" :item="vendorReview" mode="delegate" />
+    </Story>
   </Stories>
 </template>

@@ -21,15 +21,23 @@ const emit = defineEmits<{
 }>()
 
 const headingId = useId()
-const replyButton = shallowRef<HTMLElement>()
+const buttons = new Map<Inbox.TerminalAction['kind'], HTMLElement>()
 
-function setReplyButton(instance: Element | ComponentPublicInstance | null): void {
+function setButton(
+  kind: Inbox.TerminalAction['kind'],
+  instance: Element | ComponentPublicInstance | null,
+): void {
   const element: unknown = instance && '$el' in instance ? instance.$el : instance
-  replyButton.value = element instanceof HTMLElement ? element : undefined
+  if (element instanceof HTMLElement) {
+    buttons.set(kind, element)
+  } else {
+    buttons.delete(kind)
+  }
 }
 
-function focusReply(): void {
-  replyButton.value?.focus()
+/** Moves focus to the action's button, for example when the composer it opened closes. */
+function focusAction(kind: Inbox.TerminalAction['kind']): void {
+  buttons.get(kind)?.focus()
 }
 
 function act(kind: Inbox.TerminalAction['kind']): void {
@@ -43,7 +51,7 @@ defineShortcuts(
   Object.fromEntries(decisionActions.map(action => [action.key, shortcut(() => act(action.kind))])),
 )
 
-defineExpose({ focusReply })
+defineExpose({ focusAction })
 </script>
 
 <template>
@@ -53,7 +61,7 @@ defineExpose({ focusReply })
       <UButton
         v-for="action in decisionActions"
         :key="action.kind"
-        :ref="action.kind === 'reply' ? setReplyButton : undefined"
+        :ref="instance => setButton(action.kind, instance)"
         :label="action.label"
         :color="action.primary ? 'primary' : 'neutral'"
         :variant="action.primary ? 'solid' : 'outline'"

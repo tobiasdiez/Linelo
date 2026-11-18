@@ -22,4 +22,11 @@ describe('recipient labels', () => {
       'Lena Hartmann and 2 others',
     )
   })
+
+  it('lists every address, a line for to and one for cc', () => {
+    expect(formatRecipients({ to: [lena], cc: [priya, marco] }).addresses).toBe(
+      `To: ${lena.email}\nCc: ${priya.email}, ${marco.email}`,
+    )
+    expect(formatRecipients({ to: [lena], cc: [] }).addresses).toBe(`To: ${lena.email}`)
+  })
 })

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vite-plus/test'
 import { page, userEvent } from 'vite-plus/test/browser'
+import composer from './composer-locators'
 import fakeInbox from './fake-inbox-api'
 import inboxBuilders from '~/data/inbox-builders'
 import renderApp from './render-app'
@@ -7,7 +8,11 @@ import stateKeys from '~/data/state-keys'
 
 type FakeInboxApi = ReturnType<typeof fakeInbox.api>
 
-const { account, message, queueItem, signedInUser, storyItem } = inboxBuilders
+const { account, mailboxOwner, message, participant, queueItem, signedInUser, storyItem } =
+  inboxBuilders
+const lena = participant('Lena Hartmann')
+const priya = participant('Priya Nair')
+const jonas = participant('Jonas Weber')
 const first = queueItem({
   id: 'first',
   subject: 'First thread',
@@ -19,7 +24,20 @@ const first = queueItem({
 })
 const second = queueItem({ id: 'second', subject: 'Second thread' })
 const third = queueItem({ id: 'third', subject: 'Third thread' })
-const SEND_KEYS = useKbd().macOS.value ? '{Meta>}{Enter}{/Meta}' : '{Control>}{Enter}{/Control}'
+/** Ends with the user's own reply, sent from Outlook after Lena's message arrived. */
+const answeredInOutlook = queueItem({
+  id: 'answered',
+  subject: 'First thread',
+  messages: [
+    message({ id: 'lena-ask', from: lena, to: [mailboxOwner], cc: [priya] }),
+    message({ id: 'own-reply', from: mailboxOwner, to: [lena], unread: false }),
+  ],
+})
+const { noteBox, recipientBox, replyBox, sendKeys: SEND_KEYS } = composer
+const TWO_FAILURES_AND_A_SEND = 3
+/** Longer than the 4 s other toasts stay. */
+const AFTER_OTHER_TOASTS_CLOSED_MS = 4500
+const UNCONFIRMED_REPLY = "Outlook didn't confirm the reply. Check Sent Items before sending again."
 const { first: FIRST_PAGE, refill: REFILL_PAGE } = useInboxQueue.pageSizes
 
 /**
@@ -59,6 +77,15 @@ function heading(): ReturnType<typeof page.getByRole> {
 
 function rootToken(name: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+}
+
+/** Opens the forward composer and fills it in, without sending. */
+async function fillForward(to: string, note: string): Promise<void> {
+  await userEvent.keyboard('d')
+  await expect.element(recipientBox()).toHaveFocus()
+  await userEvent.keyboard(to)
+  await userEvent.tab()
+  await userEvent.keyboard(note)
 }
 
 describe('inbox page', () => {
@@ -115,7 +142,7 @@ describe('inbox page', () => {
       await expect.element(heading()).toHaveTextContent('Second thread')
       await expect.element(heading()).toHaveFocus()
 
-      expect(api.posts()).toStrictEqual([
+      expect(api.readPosts()).toStrictEqual([
         { accountId: account.id, messageIds: ['first-new-1', 'first-new-2'], read: true },
       ])
     })
@@ -133,7 +160,7 @@ describe('inbox page', () => {
 
       await expect.element(heading()).toHaveTextContent('First thread')
       await vi.waitFor(() =>
-        expect(api.posts().at(-1)).toStrictEqual({
+        expect(api.readPosts().at(-1)).toStrictEqual({
           accountId: account.id,
           messageIds: ['first-new-1', 'first-new-2'],
           read: false,
@@ -159,31 +186,301 @@ describe('inbox page', () => {
     })
   })
 
-  it('says Reply, Add to Todoist and Delegate are not available yet, and resolves nothing', async () => {
+  it('sends the reply to the latest unread message and shows the next thread', async () => {
+    expect.hasAssertions()
+
+    await withInbox([answeredInOutlook, second], async api => {
+      await userEvent.keyboard('r')
+      await expect.element(replyBox()).toHaveFocus()
+      await expect.element(page.getByText('Sending resolves this message.')).toBeVisible()
+      await userEvent.keyboard('Thursday works.{Enter}{Enter}Mara')
+      await userEvent.keyboard(SEND_KEYS)
+
+      await expect.element(heading()).toHaveTextContent('Second thread')
+      await expect.element(heading()).toHaveFocus()
+      await expect.element(page.getByText('Replied to Lena Hartmann and 1 other')).toBeVisible()
+      // The subject, as for the other confirmations
+      await expect.element(page.getByText('First thread', { exact: true })).toBeVisible()
+      // Mail cannot be unsent
+      await expect.element(page.getByRole('button', { name: 'Undo' })).not.toBeInTheDocument()
+
+      expect(api.replyPosts()).toStrictEqual([
+        {
+          accountId: account.id,
+          messageId: 'lena-ask',
+          body: 'Thursday works.\n\nMara',
+          to: [lena],
+          cc: [priya],
+          markAsRead: ['lena-ask'],
+        },
+      ])
+      // The server marks the thread as read along with the send
+      expect(api.readPosts()).toStrictEqual([])
+    })
+  })
+
+  it('keeps the composer, the draft and the focus when the reply could not be sent', async () => {
+    expect.hasAssertions()
+    vi.spyOn(console, 'error').mockReturnValue()
+
+    await withInbox(
+      [first, second],
+      async api => {
+        await userEvent.keyboard('r')
+        await userEvent.keyboard('Thursday works.')
+        await userEvent.keyboard(SEND_KEYS)
+
+        await expect
+          .element(page.getByText("Couldn't send the reply. Your draft is still here."))
+          .toBeVisible()
+        await expect.element(heading()).toHaveTextContent('First thread')
+        await expect.element(replyBox()).toHaveValue('Thursday works.')
+        await expect.element(replyBox()).toHaveFocus()
+
+        // A second failure replaces the first notice instead of stacking a copy
+        await userEvent.keyboard(SEND_KEYS)
+        await vi.waitFor(() => expect(api.replyPosts()).toHaveLength(2))
+        await expect
+          .element(page.getByText("Couldn't send the reply. Your draft is still here."))
+          .toBeVisible()
+
+        expect(
+          page.getByText("Couldn't send the reply. Your draft is still here.").elements(),
+        ).toHaveLength(1)
+
+        // The next try goes through, and the failure no longer applies
+        api.reply.answer = fakeInbox.noContent
+        await userEvent.keyboard(SEND_KEYS)
+
+        await expect.element(heading()).toHaveTextContent('Second thread')
+        await expect
+          .element(page.getByText("Couldn't send the reply. Your draft is still here."))
+          .not.toBeInTheDocument()
+        expect(api.replyPosts()).toHaveLength(TWO_FAILURES_AND_A_SEND)
+      },
+      {
+        prepare: api => {
+          api.reply.answer = fakeInbox.unavailableResponse
+        },
+      },
+    )
+  })
+
+  it('warns when Outlook did not confirm the reply, keeps the draft, and keeps the warning on Escape', async () => {
+    expect.hasAssertions()
+    vi.spyOn(console, 'error').mockReturnValue()
+
+    await withInbox([first, second], async api => {
+      api.reply.answer = fakeInbox.uncertainResponse
+      await userEvent.keyboard('r')
+      await userEvent.keyboard('Thursday works.')
+      await page.getByRole('button', { name: 'Send reply' }).click()
+
+      await expect.element(page.getByText(UNCONFIRMED_REPLY)).toBeVisible()
+      await expect.element(replyBox()).toHaveValue('Thursday works.')
+      await expect.element(heading()).toHaveTextContent('First thread')
+
+      // Escape leaves the composer, the warning stays
+      await userEvent.keyboard('{Escape}')
+
+      await expect.element(page.getByRole('button', { name: 'Reply', exact: true })).toBeVisible()
+      await expect.element(page.getByText(UNCONFIRMED_REPLY)).toBeVisible()
+    })
+  })
+
+  it('keeps the warning about one thread when a reply on the next one goes through', async () => {
+    expect.hasAssertions()
+    vi.spyOn(console, 'error').mockReturnValue()
+
+    await withInbox([first, second, third], async api => {
+      api.reply.answer = fakeInbox.uncertainResponse
+      await userEvent.keyboard('r')
+      await userEvent.keyboard('Thursday works.')
+      await userEvent.keyboard(SEND_KEYS)
+      await expect.element(page.getByText(UNCONFIRMED_REPLY)).toBeVisible()
+      await userEvent.keyboard('{Escape}')
+      await userEvent.keyboard('h')
+      await expect.element(heading()).toHaveTextContent('Second thread')
+      // The toaster shows two toasts at most; make room, as a user reading them would
+      await page
+        .getByRole('listitem')
+        .filter({ hasText: 'Marked as handled' })
+        .getByRole('button', { name: 'Close' })
+        .click()
+      // A closed toast leaves the toaster's list a moment later; until then it still counts
+      await vi.waitFor(() => expect(useToast().toasts.value).toHaveLength(1))
+      api.reply.answer = fakeInbox.noContent
+      await userEvent.keyboard('r')
+      await userEvent.keyboard('Thanks.')
+      await userEvent.keyboard(SEND_KEYS)
+
+      await expect.element(heading()).toHaveTextContent('Third thread')
+      await expect.element(page.getByText(UNCONFIRMED_REPLY)).toBeVisible()
+      // It says which thread it is about
+      await expect.element(page.getByText('First thread', { exact: true })).toBeVisible()
+    })
+  })
+
+  it('closes a toast on Escape pressed inside it, and stays in the composer', async () => {
+    expect.hasAssertions()
+    vi.spyOn(console, 'error').mockReturnValue()
+
+    await withInbox([first, second], async api => {
+      api.reply.answer = fakeInbox.unavailableResponse
+      await userEvent.keyboard('r')
+      await userEvent.keyboard('Thursday works.')
+      await userEvent.keyboard(SEND_KEYS)
+      await expect
+        .element(page.getByText("Couldn't send the reply. Your draft is still here."))
+        .toBeVisible()
+      page.getByRole('button', { name: 'Close' }).element().focus()
+      await userEvent.keyboard('{Escape}')
+
+      await expect
+        .element(page.getByText("Couldn't send the reply. Your draft is still here."))
+        .not.toBeInTheDocument()
+      await expect.element(replyBox()).toHaveValue('Thursday works.')
+    })
+  })
+
+  it('keeps the warning that replaced an earlier failure past the time other toasts close', async () => {
+    expect.hasAssertions()
+    vi.spyOn(console, 'error').mockReturnValue()
+
+    await withInbox([first, second], async api => {
+      api.reply.answer = fakeInbox.unavailableResponse
+      await userEvent.keyboard('r')
+      await userEvent.keyboard('Thursday works.')
+      await userEvent.keyboard(SEND_KEYS)
+      await expect
+        .element(page.getByText("Couldn't send the reply. Your draft is still here."))
+        .toBeVisible()
+      api.reply.answer = fakeInbox.uncertainResponse
+      await userEvent.keyboard(SEND_KEYS)
+      await expect.element(page.getByText(UNCONFIRMED_REPLY)).toBeVisible()
+      await new Promise(resolve => {
+        setTimeout(resolve, AFTER_OTHER_TOASTS_CLOSED_MS)
+      })
+
+      await expect.element(page.getByText(UNCONFIRMED_REPLY)).toBeVisible()
+    })
+  })
+
+  it.each([
+    ['a 502 of a proxy', () => new Response('<html>Bad gateway</html>', { status: 502 })],
+    [
+      'a 504 of a proxy with an HTML body',
+      () => new Response('<html>Timeout</html>', { status: 504 }),
+    ],
+  ])('treats %s as a reply that may have gone out', async (_, answer) => {
+    expect.hasAssertions()
+    vi.spyOn(console, 'error').mockReturnValue()
+
+    await withInbox([first, second], async api => {
+      api.reply.answer = answer
+      await userEvent.keyboard('r')
+      await userEvent.keyboard('Thursday works.')
+      await userEvent.keyboard(SEND_KEYS)
+
+      await expect.element(page.getByText(UNCONFIRMED_REPLY)).toBeVisible()
+      await expect.element(replyBox()).toHaveValue('Thursday works.')
+    })
+  })
+
+  it('sends the user to sign in again when sending needs access Linelo lost', async () => {
+    expect.hasAssertions()
+    vi.spyOn(console, 'error').mockReturnValue()
+
+    await withInbox([first, second], async api => {
+      api.reply.answer = fakeInbox.reconnectResponse
+      await userEvent.keyboard('r')
+      await userEvent.keyboard('Thursday works.')
+      await userEvent.keyboard(SEND_KEYS)
+
+      await expect
+        .element(page.getByText('Sign in again so Linelo can keep working with your mail.'))
+        .toBeInTheDocument()
+    })
+  })
+
+  it('forwards the latest unread message with D and shows the next thread', async () => {
+    expect.hasAssertions()
+
+    await withInbox([first, second], async api => {
+      await fillForward('Jonas Weber <jonas.weber@northwind.co>', 'Can you take this one?')
+      await page.getByRole('button', { name: 'Forward', exact: true }).click()
+
+      await expect.element(heading()).toHaveTextContent('Second thread')
+      await expect.element(heading()).toHaveFocus()
+      await expect.element(page.getByText('Forwarded to Jonas Weber')).toBeVisible()
+      // The subject, as for Mark as handled
+      await expect.element(page.getByText('First thread', { exact: true })).toBeVisible()
+
+      expect(api.forwardPosts()).toStrictEqual([
+        {
+          accountId: account.id,
+          messageId: 'first-new-2',
+          to: [jonas],
+          note: 'Can you take this one?',
+          markAsRead: ['first-new-1', 'first-new-2'],
+        },
+      ])
+    })
+  })
+
+  it('keeps the recipient and the note when forwarding failed or was not confirmed', async () => {
+    expect.hasAssertions()
+    vi.spyOn(console, 'error').mockReturnValue()
+
+    await withInbox([first, second], async api => {
+      api.forward.answer = fakeInbox.unavailableResponse
+      await fillForward('jonas.weber@northwind.co', 'For you.')
+      await userEvent.keyboard(SEND_KEYS)
+
+      await expect
+        .element(page.getByText("Couldn't forward this message. Your note is still here."))
+        .toBeVisible()
+      await expect.element(noteBox()).toHaveFocus()
+
+      api.forward.answer = fakeInbox.uncertainResponse
+      await userEvent.keyboard(SEND_KEYS)
+
+      await expect
+        .element(
+          page.getByText(
+            "Outlook didn't confirm the forward. Check Sent Items before sending again.",
+          ),
+        )
+        .toBeVisible()
+      // It took the failure's place
+      await expect
+        .element(page.getByText("Couldn't forward this message. Your note is still here."))
+        .not.toBeInTheDocument()
+      await expect.element(recipientBox()).toHaveValue('jonas.weber@northwind.co')
+      await expect.element(noteBox()).toHaveValue('For you.')
+      await expect.element(heading()).toHaveTextContent('First thread')
+      expect(api.forwardPosts()).toHaveLength(2)
+    })
+  })
+
+  it('says Add to Todoist is not available yet, once for repeated presses, and keeps the brand colours', async () => {
     expect.hasAssertions()
 
     await withInbox([storyItem('thread-vendor-review'), second], async api => {
-      await userEvent.keyboard('1')
-      await expect.element(page.getByRole('textbox', { name: 'Reply' })).toHaveFocus()
-      await userEvent.keyboard(SEND_KEYS)
-
-      await expect.element(page.getByText("Replying isn't available yet.")).toBeInTheDocument()
-      // The draft stays in the open composer
-      await expect.element(page.getByRole('textbox', { name: 'Reply' })).toBeVisible()
-
-      await userEvent.keyboard('{Escape}')
       await userEvent.keyboard('t')
-      await userEvent.keyboard('d')
+      await userEvent.keyboard('t')
 
       await expect
         .element(page.getByText("Adding to Todoist isn't available yet."))
         .toBeInTheDocument()
-      await expect.element(page.getByText("Delegating isn't available yet.")).toBeInTheDocument()
+
+      expect(page.getByText("Adding to Todoist isn't available yet.").elements()).toHaveLength(1)
       await expect
         .element(heading())
         .toHaveTextContent('Vendor review: can we move sign-off to Thursday?')
-
-      expect(api.posts()).toStrictEqual([])
+      expect(api.readPosts()).toStrictEqual([])
+      // Icons rendered at runtime (here the toast's close icon) must not reset the brand tokens
+      expect(rootToken('--ui-bg')).toBe(rootToken('--color-off-white'))
     })
   })
 
@@ -227,7 +524,7 @@ describe('inbox page', () => {
       await userEvent.keyboard('h')
 
       await expect
-        .element(page.getByText('Sign in again so Linelo can keep reading your mail.'))
+        .element(page.getByText('Sign in again so Linelo can keep working with your mail.'))
         .toBeInTheDocument()
     })
   })
@@ -256,7 +553,7 @@ describe('inbox page', () => {
       undefined,
       async () => {
         await expect
-          .element(page.getByText('Sign in again so Linelo can keep reading your mail.'))
+          .element(page.getByText('Sign in again so Linelo can keep working with your mail.'))
           .toBeInTheDocument()
       },
       {
@@ -302,7 +599,7 @@ describe('inbox page', () => {
 
       await expect.element(heading()).toHaveTextContent('First thread')
 
-      expect(api.posts()).toStrictEqual([])
+      expect(api.readPosts()).toStrictEqual([])
     })
   })
 
@@ -345,7 +642,7 @@ describe('inbox page', () => {
       api.inbox.answer = fakeInbox.reconnectResponse
       await userEvent.keyboard('h')
       await expect
-        .element(page.getByText('Sign in again so Linelo can keep reading your mail.'))
+        .element(page.getByText('Sign in again so Linelo can keep working with your mail.'))
         .toBeInTheDocument()
 
       // Back to the inbox, as after signing in again
@@ -381,21 +678,6 @@ describe('inbox page', () => {
       gate.resolve([third])
 
       await expect.element(heading()).toHaveTextContent('Third thread')
-    })
-  })
-
-  it('shows one notice for repeated Delegate presses and keeps the brand colours', async () => {
-    expect.hasAssertions()
-
-    await withInbox([first, second], async () => {
-      await userEvent.keyboard('d')
-      await userEvent.keyboard('d')
-
-      await expect.element(page.getByText("Delegating isn't available yet.")).toBeInTheDocument()
-
-      expect(page.getByText("Delegating isn't available yet.").elements()).toHaveLength(1)
-      // Icons rendered at runtime (here the toast's close icon) must not reset the brand tokens
-      expect(rootToken('--ui-bg')).toBe(rootToken('--color-off-white'))
     })
   })
 

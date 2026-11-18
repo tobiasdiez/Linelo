@@ -10,7 +10,6 @@ const { item, busy = false } = defineProps<{
 
 const emit = defineEmits<{
   resolve: [action: Inbox.TerminalAction]
-  delegate: []
 }>()
 </script>
 
@@ -30,7 +29,6 @@ const emit = defineEmits<{
       :busy="busy"
       class="motion-safe:animate-fade-in"
       @resolve="emit('resolve', $event)"
-      @delegate="emit('delegate')"
     />
   </div>
 </template>

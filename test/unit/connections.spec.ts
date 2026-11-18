@@ -2,6 +2,7 @@ import * as schema from '#server/db/schema'
 import { describe, expect, it, vi } from 'vite-plus/test'
 import calendarFakes from './calendar-fakes'
 import connections from '#server/mail/connections'
+import createMicrosoftProvider from '#server/mail/providers/microsoft'
 import mailFakes from './mail-fakes'
 import testDatabase from './test-database'
 
@@ -22,12 +23,15 @@ async function setup(accountsOf: (userId: string) => Account[]) {
   if (!mara || !other) {
     throw new Error('Users were not created')
   }
-  await database.db
-    .insert(schema.accounts)
-    .values([
-      ...accountsOf(mara.id),
-      { userId: other.id, providerId: 'microsoft', accountId: 'jonas', scope: 'Mail.ReadWrite' },
-    ])
+  await database.db.insert(schema.accounts).values([
+    ...accountsOf(mara.id),
+    {
+      userId: other.id,
+      providerId: 'microsoft',
+      accountId: 'jonas',
+      scope: 'Mail.ReadWrite,Mail.Send',
+    },
+  ])
   const tokens: Mail.TokenSource = {
     accessToken: vi.fn<Mail.TokenSource['accessToken']>(async (_, { force }) =>
       force ? 'refreshed' : 'stored',
@@ -38,6 +42,34 @@ async function setup(accountsOf: (userId: string) => Account[]) {
 }
 
 describe('mail connections', () => {
+  it('needs permission to send mail for a Microsoft account to be a mailbox', async () => {
+    expect.hasAssertions()
+    const { dependencies, userId } = await setup(id => [
+      {
+        userId: id,
+        providerId: 'microsoft',
+        accountId: 'mara-before-sending',
+        scope: 'openid,email,offline_access,User.Read,Mail.ReadWrite',
+        mailboxAddress: 'mara@old.example',
+      },
+      {
+        userId: id,
+        providerId: 'microsoft',
+        accountId: 'mara',
+        scope: 'openid,email,offline_access,User.Read,Mail.ReadWrite,Mail.Send',
+        mailboxAddress: 'mara@work.example',
+      },
+    ])
+    // The real adapter, so this follows what Microsoft mailboxes need
+    const providers = { microsoft: createMicrosoftProvider({ fetch: vi.fn<typeof fetch>() }) }
+
+    const mailboxes = await loadMailboxes({ ...dependencies, providers }, userId)
+
+    expect(mailboxes.map(({ connection }) => connection.account.address.email)).toStrictEqual([
+      'mara@work.example',
+    ])
+  })
+
   it("lists the user's accounts that were granted the provider's mail scopes", async () => {
     expect.hasAssertions()
     const { dependencies, userId } = await setup(id => [
@@ -45,7 +77,8 @@ describe('mail connections', () => {
         userId: id,
         providerId: 'microsoft',
         accountId: 'mara-work',
-        scope: 'openid,email,offline_access,User.Read,https://graph.microsoft.com/mail.readwrite',
+        scope:
+          'openid,email,offline_access,User.Read,https://graph.microsoft.com/mail.readwrite,https://graph.microsoft.com/mail.send',
         mailboxAddress: 'mara@work.example',
         mailboxName: 'Mara (work)',
       },
@@ -55,7 +88,12 @@ describe('mail connections', () => {
         accountId: 'mara-sign-in-only',
         scope: 'openid,email',
       },
-      { userId: id, providerId: 'todoist', accountId: 'mara-tasks', scope: 'Mail.ReadWrite' },
+      {
+        userId: id,
+        providerId: 'todoist',
+        accountId: 'mara-tasks',
+        scope: 'Mail.ReadWrite,Mail.Send',
+      },
     ])
 
     const mailboxes = await loadMailboxes(dependencies, userId)
@@ -68,7 +106,7 @@ describe('mail connections', () => {
   it('falls back to the user for an account without mailbox details', async () => {
     expect.hasAssertions()
     const { dependencies, userId } = await setup(id => [
-      { userId: id, providerId: 'microsoft', accountId: 'mara', scope: 'Mail.ReadWrite' },
+      { userId: id, providerId: 'microsoft', accountId: 'mara', scope: 'Mail.ReadWrite Mail.Send' },
     ])
 
     const [mailbox] = await loadMailboxes(dependencies, userId)
@@ -82,7 +120,7 @@ describe('mail connections', () => {
   it('gets the tokens of the account, refreshed when asked', async () => {
     expect.hasAssertions()
     const { dependencies, userId, tokens } = await setup(id => [
-      { userId: id, providerId: 'microsoft', accountId: 'mara', scope: 'Mail.ReadWrite' },
+      { userId: id, providerId: 'microsoft', accountId: 'mara', scope: 'Mail.ReadWrite Mail.Send' },
     ])
     const [mailbox] = await loadMailboxes(dependencies, userId)
     const account = { id: mailbox?.connection.account.id, userId }
