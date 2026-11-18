@@ -5,8 +5,11 @@
  * and kept in `shared` so the server's unit tests, which run without Nitro, see it too.
  */
 declare namespace Mail {
-  /** Why a mail call failed: the provider no longer accepts our credentials, or it is not reachable right now. */
-  type ErrorKind = 'reconnect' | 'unavailable'
+  /**
+   * Why a provider call failed: the provider no longer accepts our credentials, it is
+   * not reachable right now, or the account did not grant a permission the call needs (`consent`).
+   */
+  type ErrorKind = 'reconnect' | 'unavailable' | 'consent'
 
   interface Connection {
     account: { id: string; address: Inbox.Participant }
