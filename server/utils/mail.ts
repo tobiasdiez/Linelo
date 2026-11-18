@@ -1,16 +1,16 @@
 import MailError from '../mail/mail-error'
 import auth from './auth'
+import connections from '../mail/connections'
 import createTokenSource from '../auth/token-source'
 import db from './db'
 import httpErrorOf from '../mail/http-error'
-import loadMailboxes from '../mail/connections'
 import mailProviders from '../mail/providers'
 
 const tokens = createTokenSource(auth)
 
 /** The signed-in user's mail accounts, ready to be asked for mail. */
 function mailboxesOf(userId: string): Promise<Mail.Mailbox[]> {
-  return loadMailboxes({ db, providers: mailProviders, tokens }, userId)
+  return connections.loadMailboxes({ db, providers: mailProviders, tokens }, userId)
 }
 
 /** The HTTP answer to a failed mail call (see `httpErrorOf`). Returns anything else as it is. */

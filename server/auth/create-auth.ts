@@ -1,7 +1,8 @@
 import * as schema from '../db/schema'
 import { betterAuth } from 'better-auth'
+import calendar from '../calendar/providers'
 import type createDatabase from '../db/client'
-import demoSignIn from './demo-sign-in'
+import createDemoSignIn from './demo-sign-in'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import mailProviders from '../mail/providers'
 import mailboxFromIdToken from './id-token-mailbox'
@@ -29,8 +30,11 @@ function microsoftProvider(credentials: MicrosoftCredentials) {
     // Work, school and personal accounts
     tenantId: 'common',
     prompt: 'select_account' as const,
-    // What the mail adapter needs on top of sign-in; `Mail.Send` comes with Reply
-    scope: [...mailProviders.microsoft.mailScopes],
+    // What the mail and calendar adapters need on top of sign-in, consented to together.
+    // Better Auth sends this list with every token refresh too: an account that consented
+    // To fewer scopes is asked to sign in again, which shows Microsoft's consent for the rest.
+    // `Mail.Send` comes with Reply
+    scope: [...mailProviders.microsoft.mailScopes, ...calendar.providers.microsoft.calendarScopes],
     disableProfilePhoto: true,
     // Some accounts have no `email` claim; their sign-in name is their address
     mapProfileToUser: (profile: { email?: string; preferred_username: string }) => ({
@@ -79,7 +83,7 @@ function createAuth({ db, baseURL, secret, microsoft: credentials, development }
       },
     },
     socialProviders: credentials ? { microsoft: microsoftProvider(credentials) } : {},
-    plugins: development ? [demoSignIn] : [],
+    plugins: development ? [createDemoSignIn({ db })] : [],
     // Failed sign-ins land on the sign-in page, which explains the `error` code
     onAPIError: { errorURL: '/sign-in' },
     telemetry: { enabled: false },

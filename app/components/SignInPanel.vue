@@ -76,12 +76,13 @@ const alert = computed(() => (notice && notice !== 'cancelled' ? alerts[notice] 
     <div class="space-y-4">
       <h1 class="text-4xl font-semibold tracking-tight text-balance">Finish your inbox calmly.</h1>
       <p class="text-lg text-toned">
-        Linelo reads your unread email and marks it as read when you handle it. It never sends
-        anything on its own.
+        Linelo reads your unread email and marks it as read when you handle it, and shows your
+        calendar, adding only the events you choose. It never sends anything on its own.
       </p>
       <p class="text-toned">
         Sign in with the Microsoft account that holds your inbox. Microsoft asks you to allow read
-        and write access to your mail; Linelo only uses it to mark mail as read.
+        and write access to your mail and calendar; Linelo only uses it to mark mail as read and to
+        add the events you accept.
       </p>
     </div>
 

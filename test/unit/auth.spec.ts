@@ -161,7 +161,7 @@ describe('better auth on the application database', () => {
     expect(info?.user.email).toBe('mara@work.example')
   })
 
-  it('asks Microsoft for mail access, a refresh token and the account picker', async () => {
+  it('asks Microsoft for mail and calendar access, a refresh token and the account picker', async () => {
     expect.hasAssertions()
     const { auth } = await setup()
 
@@ -171,7 +171,7 @@ describe('better auth on the application database', () => {
     const query = new URL(url ?? '').searchParams
 
     expect(query.get('scope')?.split(' ')).toStrictEqual(
-      expect.arrayContaining(['Mail.ReadWrite', 'offline_access']),
+      expect.arrayContaining(['Mail.ReadWrite', 'Calendars.ReadWrite', 'offline_access']),
     )
     expect(query.get('prompt')).toBe('select_account')
   })
@@ -231,5 +231,50 @@ describe('better auth on the application database', () => {
       name: 'Mara Lindqvist',
       email: 'mara.lindqvist@northwind.co',
     })
+  })
+
+  it('starts the demo calendars afresh on every demo sign-in', async () => {
+    expect.hasAssertions()
+    const { auth, database } = await setup()
+    await auth.handler(new Request('http://localhost:3000/api/auth/demo/sign-in'))
+    const [demoAccount] = await database.db
+      .select()
+      .from(schema.accounts)
+      .where(eq(schema.accounts.providerId, 'demo'))
+    const userId = demoAccount?.userId ?? ''
+    const [source] = await database.db
+      .insert(schema.calendarSources)
+      .values({
+        userId,
+        kind: 'outlook',
+        accountId: demoAccount?.id,
+        externalId: 'calendar-robotics',
+        name: 'Robotics Club',
+      })
+      .returning()
+    await database.db.insert(schema.calendarDecisions).values({
+      userId,
+      sourceId: source?.id ?? '',
+      sourceEventId: 'robotics-build-night',
+      decision: 'accepted',
+      copyEventId: 'copy-gone-after-restart',
+    })
+    await database.db
+      .update(schema.users)
+      .set({ calendarSyncedAt: new Date() })
+      .where(eq(schema.users.id, userId))
+
+    await auth.handler(new Request('http://localhost:3000/api/auth/demo/sign-in'))
+
+    await expect(database.db.select().from(schema.calendarSources)).resolves.toStrictEqual([])
+    await expect(database.db.select().from(schema.calendarDecisions)).resolves.toStrictEqual([])
+    await expect(
+      database.db
+        .select({ syncedAt: schema.users.calendarSyncedAt })
+        .from(schema.users)
+        .where(eq(schema.users.id, userId)),
+      // The database answers null for an empty column
+      // eslint-disable-next-line unicorn/no-null
+    ).resolves.toStrictEqual([{ syncedAt: null }])
   })
 })

@@ -146,6 +146,12 @@ export default defineConfig({
           test: {
             name: 'nuxt',
             include: ['test/nuxt/**/*.spec.ts'],
+            /*
+             * For `expect.poll`, which gives up after 1 s otherwise; five leave room for a
+             * loaded machine. `expect.element` is not bound by it: without a provider
+             * `actionTimeout`, it retries until the test times out.
+             */
+            expect: { poll: { timeout: 5000 } },
             environment: 'nuxt',
             environmentOptions: {
               nuxt: {

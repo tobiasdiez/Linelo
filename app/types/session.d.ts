@@ -11,6 +11,9 @@ declare namespace Session {
   /** What the sign-in page explains: why the user is (back) there. */
   type SignInNotice = 'cancelled' | 'approval' | 'reconnect' | 'expired' | 'taken' | 'failed'
 
+  /** What the calendar's connect state explains after coming back from Microsoft. */
+  type ConnectNotice = 'cancelled' | 'failed'
+
   /** Why the app sent the user to sign in: Linelo lost access to the mailbox, or the session ended. */
   type SignInReason = 'reconnect' | 'expired'
 }
