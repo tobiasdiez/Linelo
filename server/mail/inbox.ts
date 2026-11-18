@@ -1,5 +1,5 @@
-import MailError from './mail-error'
 import latestUnreadMessage from '#shared/utils/latest-unread-message'
+import mailboxLookup from './mailbox-lookup'
 import participants from '#shared/utils/participants'
 import queueItemKey from '#shared/utils/queue-item-key'
 
@@ -45,11 +45,8 @@ async function loadInbox(
   mailboxes: readonly Mail.Mailbox[],
   { limit }: { limit: number },
 ): Promise<Inbox.InboxResponse> {
-  if (mailboxes.length === 0) {
-    throw new MailError('reconnect', 'No mail account is connected')
-  }
   const lists = await Promise.all(
-    mailboxes.map(async ({ provider, connection }) => {
+    mailboxLookup.requireMailboxes(mailboxes).map(async ({ provider, connection }) => {
       const threads = await provider.listUnreadThreads(connection, { limit })
       return threads.map(thread => inAccount(thread, connection.account.id))
     }),

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import RailActionBar from './RailActionBar.vue'
+import ComposerActions from './ComposerActions.vue'
 import type { UTextarea } from '#components'
 import formatRecipients from '~/utils/format-recipients'
 
@@ -11,10 +11,11 @@ const {
   followUpTask = undefined,
   busy = false,
 } = defineProps<{
+  /** Who the reply goes to. Without anyone in "to" (a note to self) it cannot be sent. */
   recipients: Inbox.ReplyRecipients
   /** Offered as an optional task to create after sending. */
   followUpTask?: Inbox.TaskDraft
-  /** True while the reply is being sent. */
+  /** True while the reply is being sent: the text is read-only, focus stays where it is. */
   busy?: boolean
 }>()
 
@@ -26,31 +27,11 @@ const emit = defineEmits<{
 const body = defineModel<string>('body', { default: '' })
 const addFollowUp = defineModel<boolean>('addFollowUp', { default: false })
 
-const { macOS } = useKbd()
 const editor = useTemplateRef<InstanceType<typeof UTextarea>>('editor')
 
-const canSend = computed(() => body.value.trim().length > 0)
+const hasRecipients = computed(() => recipients.to.length > 0)
+const canSend = computed(() => hasRecipients.value && body.value.trim().length > 0)
 const recipientLabels = computed(() => formatRecipients(recipients))
-const sendShortcut = computed(() => (macOS.value ? 'Meta+Enter' : 'Control+Enter'))
-
-function send(): void {
-  if (canSend.value && !busy) {
-    emit('send')
-  }
-}
-
-// Stay in the composer while sending: if sending fails, the draft is still here
-function back(): void {
-  if (!busy) {
-    emit('back')
-  }
-}
-
-// Both work while typing, which is where they are needed
-defineShortcuts({
-  escape: { usingInput: true, handler: shortcut(back) },
-  meta_enter: { usingInput: true, handler: shortcut(send) },
-})
 
 // Open ready to edit or send: focused, with the caret at the end
 onMounted(() => {
@@ -65,8 +46,9 @@ onMounted(() => {
 <template>
   <div class="flex flex-col gap-4">
     <UCard variant="flush" class="has-[textarea:focus-visible]:focus-ring">
-      <template #header>
-        <p class="text-xs text-muted">
+      <template v-if="hasRecipients" #header>
+        <!-- The addresses on hover, since the reply really goes to them -->
+        <p class="text-xs text-muted" :title="recipientLabels.addresses">
           To <strong class="font-semibold text-default">{{ recipientLabels.to }}</strong>
           <template v-if="recipientLabels.cc"> · Cc {{ recipientLabels.cc }}</template>
         </p>
@@ -83,11 +65,12 @@ onMounted(() => {
         :maxrows="MAX_ROWS"
         autoresize
         class="w-full"
+        :readonly="busy"
         :ui="{ base: 'lg:max-h-[calc(100dvh-29rem)]' }"
       />
 
       <template v-if="followUpTask" #footer>
-        <UCheckbox v-model="addFollowUp">
+        <UCheckbox v-model="addFollowUp" :disabled="busy">
           <template #label>
             Also add to Todoist:
             <strong class="font-semibold text-default">{{ followUpTask.title }}</strong
@@ -97,45 +80,13 @@ onMounted(() => {
       </template>
     </UCard>
 
-    <RailActionBar>
-      <UButton
-        label="Send reply"
-        color="primary"
-        variant="solid"
-        size="lg"
-        block
-        class="justify-between"
-        :disabled="!canSend"
-        :loading="busy"
-        :aria-keyshortcuts="sendShortcut"
-        @click="send"
-      >
-        <template #trailing>
-          <span aria-hidden="true" class="flex gap-0.5 max-sm:hidden">
-            <UKbd value="meta" color="primary" variant="solid" />
-            <UKbd value="enter" color="primary" variant="solid" />
-          </span>
-        </template>
-      </UButton>
-      <UButton
-        label="Back"
-        size="lg"
-        block
-        class="justify-between"
-        aria-keyshortcuts="Escape"
-        :disabled="busy"
-        @click="back"
-      >
-        <template #trailing>
-          <UKbd value="escape" aria-hidden="true" class="max-sm:hidden" />
-        </template>
-      </UButton>
-      <template #hint>
-        <!-- TODO: "Sending resolves this message." once replies are sent -->
-        <p class="mt-2 text-center text-xs text-muted">
-          Sending isn't available yet. Your draft stays here.
-        </p>
-      </template>
-    </RailActionBar>
+    <ComposerActions
+      label="Send reply"
+      :can-submit="canSend"
+      :busy="busy"
+      :hint="hasRecipients ? 'Sending resolves this message.' : 'No one to reply to.'"
+      @submit="emit('send')"
+      @back="emit('back')"
+    />
   </div>
 </template>

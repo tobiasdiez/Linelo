@@ -42,22 +42,46 @@ describe('graph client', () => {
 
     await expect(
       graphClient.create({ fetch }).send(caller, '/me/events/1', { method: 'DELETE' }),
-    ).resolves.toStrictEqual({ status: httpStatus.noContent, body: undefined })
+    ).resolves.toStrictEqual({
+      status: httpStatus.noContent,
+      body: undefined,
+      requestId: undefined,
+    })
   })
 
   it('leaves other statuses to the caller, and reports them from request as unavailable', async () => {
     expect.hasAssertions()
     const fetch = vi.fn<typeof globalThis.fetch>(
-      async () => new Response('{"error":{}}', { status: httpStatus.forbidden }),
+      async () =>
+        new Response('{"error":{"code":"ErrorItemNotFound","message":"No such calendar."}}', {
+          status: httpStatus.notFound,
+          headers: { 'request-id': 'request-7' },
+        }),
     )
     const graph = graphClient.create({ fetch })
 
     await expect(graph.send(caller, '/me/calendars')).resolves.toStrictEqual({
-      status: httpStatus.forbidden,
-      body: undefined,
+      status: httpStatus.notFound,
+      body: { error: { code: 'ErrorItemNotFound', message: 'No such calendar.' } },
+      requestId: 'request-7',
     })
     await expect(graph.request(caller, '/me/calendars')).rejects.toMatchObject({
       kind: 'unavailable',
+      // What Graph said, for the server log, with its id of the request for its support
+      message:
+        'Microsoft Graph answered 404 ErrorItemNotFound: No such calendar. (request-id request-7)',
+    })
+  })
+
+  it('reports a refusal without a readable error too', async () => {
+    expect.hasAssertions()
+    const fetch = vi.fn<typeof globalThis.fetch>(
+      async () => new Response('<html>Throttled</html>', { status: httpStatus.tooManyRequests }),
+    )
+
+    await expect(graphClient.create({ fetch }).request(caller, '/me')).rejects.toMatchObject({
+      kind: 'unavailable',
+      message: 'Microsoft Graph answered 429 (no code) (request-id unknown)',
     })
   })
 
@@ -67,7 +91,7 @@ describe('graph client', () => {
       async () => new Response(undefined, { status: httpStatus.forbidden }),
     )
     const graph = graphClient.create({ fetch })
-    const failure = vi.fn<(status: number) => Error>(
+    const failure = vi.fn<(status: number, refusal: Graph.Refusal) => Error>(
       status => new MailError('consent', `Refused (${status})`),
     )
 
@@ -77,7 +101,11 @@ describe('graph client', () => {
     await expect(graph.list(caller, '/me/calendars', { failure })).rejects.toMatchObject({
       kind: 'consent',
     })
-    expect(failure.mock.calls).toStrictEqual([[httpStatus.forbidden], [httpStatus.forbidden]])
+    const refusal = { code: undefined, message: undefined, requestId: undefined }
+    expect(failure.mock.calls).toStrictEqual([
+      [httpStatus.forbidden, refusal],
+      [httpStatus.forbidden, refusal],
+    ])
     // Not passed on to fetch
     expect(fetch.mock.calls[0]?.[1]).not.toHaveProperty('failure')
   })
@@ -108,6 +136,37 @@ describe('graph client', () => {
 
     await expect(failure).rejects.toBeInstanceOf(MailError)
     await expect(failure).rejects.toMatchObject({ kind: 'unavailable' })
+  })
+
+  it('reports a send that got no answer as unconfirmed: Graph may have sent the mail', async () => {
+    expect.hasAssertions()
+    const unreachable = vi
+      .fn<typeof globalThis.fetch>()
+      .mockRejectedValue(new TypeError('fetch failed'))
+    const send = { method: 'POST', sendsMail: true }
+
+    await expect(
+      graphClient.create({ fetch: unreachable }).request(caller, '/me/messages/1/reply', send),
+    ).rejects.toMatchObject({ kind: 'uncertain', message: 'Microsoft Graph did not answer' })
+    await expect(
+      graphClient.create({ fetch: unreachable }).request(caller, '/me/messages/1'),
+    ).rejects.toMatchObject({ kind: 'unavailable' })
+  })
+
+  it('does not read the body of an accepted send, and reads it for anything else', async () => {
+    expect.hasAssertions()
+    const fetch = vi.fn<typeof globalThis.fetch>(
+      async () => new Response('<html>', { status: httpStatus.accepted }),
+    )
+    const graph = graphClient.create({ fetch })
+
+    await expect(
+      graph.request(caller, '/me/messages/1/reply', { method: 'POST', sendsMail: true }),
+    ).resolves.toBeUndefined()
+    await expect(graph.request(caller, '/me/messages/1')).rejects.toMatchObject({
+      kind: 'unavailable',
+      message: 'Microsoft Graph answered 202 without JSON',
+    })
   })
 
   it('splits requests into batches of 20 and returns every response by id', async () => {

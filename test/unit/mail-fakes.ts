@@ -19,14 +19,21 @@ function fakeConnection(id = 'account-1', address: Inbox.Participant = MARA): Co
 type Provider = Mail.Provider & {
   listUnreadThreads: ReturnType<typeof vi.fn<Mail.Provider['listUnreadThreads']>>
   setRead: ReturnType<typeof vi.fn<Mail.Provider['setRead']>>
+  reply: ReturnType<typeof vi.fn<Mail.Provider['reply']>>
+  forward: ReturnType<typeof vi.fn<Mail.Provider['forward']>>
 }
 
-/** A provider that lists these threads, needs `Mail.ReadWrite`, and marks anything as read. */
+/**
+ * A provider that lists these threads, needs `Mail.ReadWrite` and `Mail.Send`,
+ * marks anything as read, and sends anything.
+ */
 function fakeProvider(threads: Mail.Thread[] = []): Provider {
   return {
-    mailScopes: ['Mail.ReadWrite'],
+    mailScopes: ['Mail.ReadWrite', 'Mail.Send'],
     listUnreadThreads: vi.fn<Mail.Provider['listUnreadThreads']>(async () => threads),
     setRead: vi.fn<Mail.Provider['setRead']>(async () => undefined),
+    reply: vi.fn<Mail.Provider['reply']>(async () => undefined),
+    forward: vi.fn<Mail.Provider['forward']>(async () => undefined),
   }
 }
 

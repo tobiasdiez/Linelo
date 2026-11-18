@@ -2,21 +2,26 @@ import { describe, expect, it } from 'vite-plus/test'
 import mailFakes from './mail-fakes'
 import readState from '#server/mail/read-state'
 
-describe('read state', () => {
-  it('accepts only a well-formed request', () => {
-    const valid = { accountId: 'a', messageIds: ['m1', 'm2'], read: true }
+const valid: Inbox.ReadStateRequest = { accountId: 'a', messageIds: ['m1', 'm2'], read: true }
 
-    expect(
-      [
-        valid,
-        { ...valid, read: 'yes' },
-        { ...valid, messageIds: [] },
-        { ...valid, messageIds: ['m1', 2] },
-        { ...valid, accountId: '' },
-        { ...valid, messageIds: Array.from({ length: 101 }, (_, index) => `m${index}`) },
-        undefined,
-      ].map(value => readState.isRequest(value)),
-    ).toStrictEqual([true, false, false, false, false, false, false])
+describe('read state', () => {
+  it('accepts a well-formed request', () => {
+    expect(readState.validate(valid)).toStrictEqual({ value: valid })
+  })
+
+  it.each([
+    ['read', { ...valid, read: 'yes' }],
+    ['messageIds', { ...valid, messageIds: [] }],
+    ['messageIds', { ...valid, messageIds: ['m1', 2] }],
+    [
+      'messageIds',
+      { ...valid, messageIds: Array.from({ length: 101 }, (_, index) => `m${index}`) },
+    ],
+    ['accountId', { ...valid, accountId: '' }],
+    ['unread', { ...valid, unread: false }],
+    ['request', undefined],
+  ])('refuses a request with a bad %s', (field, body) => {
+    expect(readState.validate(body)).toStrictEqual({ field })
   })
 
   it('marks the messages in the mailbox they belong to', async () => {
@@ -24,13 +29,12 @@ describe('read state', () => {
     const personal = mailFakes.mailbox('personal')
     const office = mailFakes.mailbox('office')
 
-    const applied = await readState.apply([personal, office], {
+    await readState.apply([personal, office], {
       accountId: 'office',
       messageIds: ['m1'],
       read: false,
     })
 
-    expect({ applied }).toStrictEqual({ applied: true })
     expect(office.provider.setRead).toHaveBeenCalledExactlyOnceWith(
       office.connection,
       ['m1'],
@@ -43,13 +47,17 @@ describe('read state', () => {
     expect.hasAssertions()
     const personal = mailFakes.mailbox('personal')
 
-    const applied = await readState.apply([personal], {
-      accountId: 'someone-else',
-      messageIds: ['m1'],
-      read: true,
-    })
-
-    expect({ applied }).toStrictEqual({ applied: false })
+    await expect(
+      readState.apply([personal], { accountId: 'someone-else', messageIds: ['m1'], read: true }),
+    ).rejects.toMatchObject({ kind: 'unknownAccount' })
     expect(personal.provider.setRead).not.toHaveBeenCalled()
+  })
+
+  it('asks to sign in again when the user has no mailbox at all', async () => {
+    expect.hasAssertions()
+
+    await expect(
+      readState.apply([], { accountId: 'personal', messageIds: ['m1'], read: true }),
+    ).rejects.toMatchObject({ kind: 'reconnect' })
   })
 })

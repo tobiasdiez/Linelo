@@ -33,7 +33,6 @@ function microsoftProvider(credentials: MicrosoftCredentials) {
     // What the mail and calendar adapters need on top of sign-in, consented to together.
     // Better Auth sends this list with every token refresh too: an account that consented
     // To fewer scopes is asked to sign in again, which shows Microsoft's consent for the rest.
-    // `Mail.Send` comes with Reply
     scope: [...mailProviders.microsoft.mailScopes, ...calendar.providers.microsoft.calendarScopes],
     disableProfilePhoto: true,
     // Some accounts have no `email` claim; their sign-in name is their address

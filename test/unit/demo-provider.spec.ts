@@ -40,4 +40,57 @@ describe('demo mailbox', () => {
     expect(otherAccount[0]?.subject).toBe('Vendor review: can we move sign-off to Thursday?')
     expect(afterUndo[0]?.subject).toBe('Vendor review: can we move sign-off to Thursday?')
   })
+
+  it("adds the owner's reply to the thread, which then shows it once it is unread again", async () => {
+    expect.hasAssertions()
+    const provider = createDemoProvider({ now: () => NOW })
+    const mara = connection('mara')
+    const lena = { name: 'Lena Hartmann', email: 'lena.hartmann@northwind.co' }
+
+    await provider.reply(mara, {
+      messageId: 'vendor-review-3',
+      body: 'Thursday works.',
+      to: [lena],
+      cc: [],
+    })
+    const [vendor] = await provider.listUnreadThreads(mara, { limit: 1 })
+    const messages = vendor?.messages ?? []
+
+    expect(messages.map(message => message.id)).toStrictEqual([
+      'vendor-review-1',
+      'vendor-review-2',
+      'vendor-review-3',
+      expect.stringMatching(/^vendor-review-3-sent-/),
+    ])
+    expect(messages.at(-1)).toMatchObject({
+      from: mara.account.address,
+      to: [lena],
+      cc: [],
+      body: 'Thursday works.',
+      sentAt: NOW.toISOString(),
+      unread: false,
+    })
+  })
+
+  it('adds a forward with its note and who it went to, and refuses an unknown message', async () => {
+    expect.hasAssertions()
+    const provider = createDemoProvider({ now: () => NOW })
+    const mara = connection('mara')
+    const jonas = { name: 'Jonas Weber', email: 'jonas.weber@northwind.co' }
+
+    await provider.forward(mara, { messageId: 'staging-1', to: [jonas], note: '' })
+    await provider.forward(mara, { messageId: 'staging-1', to: [jonas], note: ' Have a look. ' })
+    const threads = await provider.listUnreadThreads(mara, { limit: 10 })
+    const staging = threads.find(thread => thread.id === 'thread-staging')
+
+    expect(staging?.messages.slice(1).map(message => [message.body, message.to])).toStrictEqual([
+      ['Forwarded to Jonas Weber.', [jonas]],
+      ['Have a look.\n\nForwarded to Jonas Weber.', [jonas]],
+    ])
+    const ids = staging?.messages.map(message => message.id) ?? []
+    expect(new Set(ids).size).toBe(ids.length)
+    await expect(
+      provider.forward(mara, { messageId: 'gone', to: [jonas], note: '' }),
+    ).rejects.toMatchObject({ kind: 'unavailable' })
+  })
 })

@@ -9,10 +9,12 @@ interface TaskManager {
 
 /*
  * TODO: Create the task through the Todoist API, with a link to the email, once
- * the Todoist connection exists. Until then creation succeeds immediately.
+ * the Todoist connection exists. Until then creation fails, so a follow-up task
+ * is never claimed next to a reply that was really sent. The page does not offer
+ * Add to Todoist yet.
  */
 function createTask(_task: TaskRequest): Promise<void> {
-  return Promise.resolve()
+  return Promise.reject(new Error("Todoist isn't connected yet"))
 }
 
 // One shared instance, like the Todoist client it will wrap

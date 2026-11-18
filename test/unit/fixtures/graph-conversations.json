@@ -34,6 +34,7 @@
               "emailAddress": { "name": "Mara Lindqvist", "address": "mara.lindqvist@northwind.co" }
             }
           ],
+          "replyTo": [],
           "ccRecipients": [
             { "emailAddress": { "name": "Priya Nair", "address": "priya.nair@northwind.co" } }
           ],
@@ -164,6 +165,15 @@
           "from": {
             "emailAddress": { "name": "Operator Weekly", "address": "hello@operatorweekly.com" }
           },
+          "replyTo": [
+            {
+              "emailAddress": {
+                "name": "Operator Weekly Editors",
+                "address": "editors@operatorweekly.com"
+              }
+            },
+            { "emailAddress": { "name": "Nameless" } }
+          ],
           "toRecipients": [
             {
               "emailAddress": { "name": "Mara Lindqvist", "address": "mara.lindqvist@northwind.co" }

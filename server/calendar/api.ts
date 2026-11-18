@@ -36,7 +36,7 @@ interface Input {
 /** The HTTP answer: a success with its body, or an error with its message (and a `reason` for the app). */
 type Answer =
   | { status: number; body: unknown }
-  | { status: number; statusMessage: string; data?: { reason: 'reconnect' | 'consent' } }
+  | { status: number; statusMessage: string; data?: { reason: Inbox.ApiErrorReason } }
 
 type Endpoint = (request: ApiRequest) => Promise<Answer>
 

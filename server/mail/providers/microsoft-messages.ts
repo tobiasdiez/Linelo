@@ -91,6 +91,7 @@ function parse(value: Message): GraphMessage | undefined {
   const message: Inbox.Message = {
     id,
     from: participant(value.from) ?? participant(value.sender) ?? UNKNOWN_SENDER,
+    replyTo: participants(value.replyTo),
     to: participants(value.toRecipients),
     cc: participants(value.ccRecipients),
     sentAt: value.sentDateTime ?? receivedAt,

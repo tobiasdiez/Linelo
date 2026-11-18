@@ -33,6 +33,8 @@ export default defineAppConfig({
             root: 'border-amber-200 bg-amber-50/80',
             title: 'text-amber-950',
             description: 'text-amber-950',
+            // Darker than `text-warning`, which is too faint on the amber surface
+            icon: 'text-amber-700',
           },
         },
         {
@@ -42,6 +44,7 @@ export default defineAppConfig({
             root: 'border-red-200 bg-red-50/85',
             title: 'text-red-900',
             description: 'text-red-900',
+            icon: 'text-red-700',
           },
         },
       ],
@@ -197,6 +200,20 @@ export default defineAppConfig({
           size: 'lg',
           class: { base: 'px-4 py-3.5' },
         },
+        {
+          // Composer fields while sending: still focusable, visibly not editable
+          variant: 'none',
+          class: { base: 'read-only:opacity-75' },
+        },
+      ],
+    },
+    input: {
+      compoundVariants: [
+        {
+          // Composer fields while sending, as for textareas
+          variant: 'none',
+          class: { base: 'read-only:opacity-75' },
+        },
       ],
     },
     checkbox: {
@@ -240,6 +257,20 @@ export default defineAppConfig({
       },
     },
     toast: {
+      variants: {
+        color: {
+          /*
+           * A send the mailbox did not confirm: set apart from errors, like the warning
+           * alert. `text-warning` alone is too faint an icon on white for the one toast
+           * that has to be noticed.
+           */
+          warning: {
+            root: 'bg-amber-50 ring-amber-300',
+            title: 'text-amber-950',
+            icon: 'text-amber-700',
+          },
+        },
+      },
       defaultVariants: {
         color: 'neutral',
         // Polite announcements: confirmations should not interrupt screen readers

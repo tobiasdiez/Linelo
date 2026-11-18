@@ -39,7 +39,7 @@ const alerts: Record<
   reconnect: {
     color: 'neutral',
     icon: 'i-lucide-info',
-    text: 'Sign in again so Linelo can keep reading your mail.',
+    text: 'Sign in again so Linelo can keep working with your mail.',
   },
   expired: {
     color: 'neutral',
@@ -77,12 +77,13 @@ const alert = computed(() => (notice && notice !== 'cancelled' ? alerts[notice] 
       <h1 class="text-4xl font-semibold tracking-tight text-balance">Finish your inbox calmly.</h1>
       <p class="text-lg text-toned">
         Linelo reads your unread email and marks it as read when you handle it, and shows your
-        calendar, adding only the events you choose. It never sends anything on its own.
+        calendar, adding only the events you choose. It sends the replies and forwards you write,
+        and never anything on its own.
       </p>
       <p class="text-toned">
-        Sign in with the Microsoft account that holds your inbox. Microsoft asks you to allow read
-        and write access to your mail and calendar; Linelo only uses it to mark mail as read and to
-        add the events you accept.
+        Sign in with the Microsoft account that holds your inbox. Microsoft asks you to allow
+        reading, writing and sending mail, and reading and writing your calendar; Linelo only uses
+        that access for the actions you take.
       </p>
     </div>
 

@@ -1,5 +1,6 @@
-import type { Attachment, Message } from '@microsoft/microsoft-graph-types'
+import type { Attachment, Message, Recipient } from '@microsoft/microsoft-graph-types'
 import MailError from '../mail-error'
+import commentHtml from './comment-html'
 import graphClient from '../../microsoft/graph-client'
 import httpStatus from '#shared/utils/http-status'
 import isRecord from '#shared/utils/is-record'
@@ -8,13 +9,17 @@ import providerAuth from '../provider-auth'
 
 /*
  * Microsoft Graph adapter: the only code that knows about Outlook. Plain
- * `fetch` against Graph v1.0, no SDK; Graph's own types (`@microsoft/microsoft-graph-types`)
- * for the fields it selects and reads.
+ * `fetch` against Graph v1.0 through the shared client, no SDK; Graph's own types
+ * (`@microsoft/microsoft-graph-types`) for the fields it selects and reads.
  */
 
 /** Message ids that survive moves between folders, so marking as read does not fail after an inbox rule ran. */
 const IMMUTABLE_IDS = 'IdType="ImmutableId"'
 const TEXT_BODIES = 'outlook.body-content-type="text"'
+/** Headers of a JSON request about a message, which is addressed by its immutable id. */
+const JSON_BY_IMMUTABLE_ID = { 'Content-Type': 'application/json', 'Prefer': IMMUTABLE_IDS }
+/** Graph's error code for a token without the permission the call needs (here: `Mail.Send`). */
+const ACCESS_DENIED = 'ErrorAccessDenied'
 /** How many of the newest unread inbox messages are looked at to find conversations. */
 const UNREAD_SCAN_SIZE = 50
 /** How many of a conversation's newest messages come with it. */
@@ -28,6 +33,7 @@ const MESSAGE_FIELDS: readonly (keyof Message)[] = [
   'subject',
   'from',
   'sender',
+  'replyTo',
   'toRecipients',
   'ccRecipients',
   'sentDateTime',
@@ -45,12 +51,19 @@ const HIDDEN_FOLDERS = ['deleteditems', 'junkemail']
 /** The Graph client to share with the other adapters, or what to create one from. */
 type Dependencies = { graph: Graph.Client } | { fetch: typeof fetch; timeoutMs?: number }
 
+/** A Graph action on a message that sends mail, and its JSON body. */
+interface MessageAction {
+  messageId: string
+  action: 'reply' | 'forward'
+  body: Record<string, unknown>
+}
+
 interface Conversations {
   conversationIds: readonly string[]
   hiddenFolderIds: ReadonlySet<string>
 }
 
-const { query, assertAuthorized, assertSucceeded } = graphClient
+const { query, said, assertAuthorized, assertSucceeded } = graphClient
 
 function unreadInboxUrl(): string {
   return `/me/mailFolders/inbox/messages?${query({
@@ -92,7 +105,7 @@ function readStateRequest(messageId: string, index: number, read: boolean): Grap
     id: `message-${index}`,
     method: 'PATCH',
     url: `/me/messages/${encodeURIComponent(messageId)}`,
-    headers: { 'Content-Type': 'application/json', 'Prefer': IMMUTABLE_IDS },
+    headers: JSON_BY_IMMUTABLE_ID,
     body: { isRead: read },
   }
 }
@@ -133,6 +146,37 @@ function toThreads(
   return threads
 }
 
+/**
+ * What a refused send means, by Graph's status and error code (401 is handled
+ * before: refresh and try once more). 403 with `ErrorAccessDenied`: the permission
+ * to send is missing or was revoked, which signing in again fixes; any other 403
+ * (a send restriction) is not. A server error other than 503: Graph's front end may
+ * have passed the mail on before failing, so it may be out. Anything else (400,
+ * 404 for a message that is gone, 429, 503) was refused before sending.
+ */
+function sendFailure(status: number, code: string | undefined): Mail.ProviderErrorKind {
+  if (status === httpStatus.forbidden) {
+    return code === ACCESS_DENIED ? 'reconnect' : 'unavailable'
+  }
+  if (status >= httpStatus.internalServerError && status !== httpStatus.serviceUnavailable) {
+    return 'uncertain'
+  }
+  return 'unavailable'
+}
+
+/** The error for a refused send: what it means, with what Graph said for the server log. */
+function sendRefused(status: number, refusal: Graph.Refusal): Error {
+  return new MailError(
+    sendFailure(status, refusal.code),
+    `Microsoft Graph refused a send with ${said(status, refusal)}`,
+  )
+}
+
+/** Participants as Graph's recipients. */
+function recipients(list: readonly Inbox.Participant[]): Recipient[] {
+  return list.map(({ name, email }) => ({ emailAddress: { name, address: email } }))
+}
+
 /** Creates the Microsoft Graph mail provider. */
 function createMicrosoftProvider(dependencies: Dependencies): Mail.Provider {
   const { request, batch } =
@@ -144,6 +188,13 @@ function createMicrosoftProvider(dependencies: Dependencies): Mail.Provider {
     const body = await request(caller, unreadInboxUrl(), {
       headers: { Prefer: IMMUTABLE_IDS },
     })
+    // Never an empty inbox for an answer that is not a list
+    if (!isRecord(body) || !Array.isArray(body.value)) {
+      throw new MailError(
+        'unavailable',
+        'Microsoft Graph listed unread mail without a `value` list',
+      )
+    }
     const unread = microsoftMessages.parseList(body)
     return [...new Set(unread.map(entry => entry.conversationId))].slice(0, limit)
   }
@@ -197,7 +248,62 @@ function createMicrosoftProvider(dependencies: Dependencies): Mail.Provider {
     })
   }
 
-  return { mailScopes: ['Mail.ReadWrite'], listUnreadThreads, setRead }
+  /**
+   * Posts a Graph action on the message that sends mail (`reply`, `forward`). A 401
+   * is retried once with a refreshed token: Graph refused it before acting, so
+   * nothing is sent twice.
+   */
+  async function sendMail(
+    connection: Mail.Connection,
+    { messageId, action, body }: MessageAction,
+  ): Promise<void> {
+    const path = `/me/messages/${encodeURIComponent(messageId)}/${action}`
+    await providerAuth.withToken(connection, token =>
+      request({ accountId: connection.account.id, token }, path, {
+        method: 'POST',
+        headers: JSON_BY_IMMUTABLE_ID,
+        body,
+        sendsMail: true,
+        failure: sendRefused,
+      }),
+    )
+  }
+
+  /** Graph quotes the original below the comment; the recipients are explicit, so the mail is exactly what the composer showed. */
+  async function reply(
+    connection: Mail.Connection,
+    { messageId, body, to, cc }: Mail.OutgoingReply,
+  ): Promise<void> {
+    await sendMail(connection, {
+      messageId,
+      action: 'reply',
+      body: {
+        comment: commentHtml(body),
+        message: { toRecipients: recipients(to), ccRecipients: recipients(cc) },
+      },
+    })
+  }
+
+  /** Graph includes the original's attachments and puts the note above it. */
+  async function forward(
+    connection: Mail.Connection,
+    { messageId, to, note }: Mail.OutgoingForward,
+  ): Promise<void> {
+    await sendMail(connection, {
+      messageId,
+      action: 'forward',
+      body: { comment: commentHtml(note), toRecipients: recipients(to) },
+    })
+  }
+
+  return {
+    // `Mail.ReadWrite` to read and mark as read (the smallest scope that can), `Mail.Send` to send replies and forwards
+    mailScopes: ['Mail.ReadWrite', 'Mail.Send'],
+    listUnreadThreads,
+    setRead,
+    reply,
+    forward,
+  }
 }
 
 export default createMicrosoftProvider

@@ -64,12 +64,39 @@ function fixtureAnswer(request: InnerRequest): { status: number; body?: unknown 
   return entries[key] ?? { status: httpStatus.notFound }
 }
 
-/** A stand-in for Microsoft Graph: answers the unread listing and JSON batches, and records every call. */
+/**
+ * Graph's answer to a send (`reply`, `forward`): `202 Accepted` without a body, or
+ * for a failure its JSON error with the request id.
+ */
+function sendAnswer(status: number = httpStatus.accepted, code = 'Forced'): Response {
+  if (httpStatus.isSuccess(status)) {
+    return new Response(undefined, { status })
+  }
+  return Response.json(
+    { error: { code, message: 'Refused by the test' } },
+    { status, headers: { 'request-id': 'request-7' } },
+  )
+}
+
+interface FakeGraphOptions {
+  unread?: unknown
+  answer?: InnerAnswer
+  /** Every answer, when set: a status Graph refuses with. */
+  status?: () => number | undefined
+  /** The answer to a send (any other POST than a batch). */
+  answerSend?: () => Response
+}
+
+/**
+ * A stand-in for Microsoft Graph: answers the unread listing, JSON batches and
+ * sends (`202 Accepted` unless `answerSend` says otherwise), and records every call.
+ */
 function fakeGraph({
   unread = unreadInbox,
   answer = fixtureAnswer,
   status,
-}: { unread?: unknown; answer?: InnerAnswer; status?: () => number | undefined } = {}) {
+  answerSend = () => sendAnswer(),
+}: FakeGraphOptions = {}) {
   // Fresh spies for every test that builds a fake
   vi.restoreAllMocks()
   const warn = vi.spyOn(console, 'warn').mockReturnValue()
@@ -90,7 +117,7 @@ function fakeGraph({
       })
       return json({ responses: responses.toReversed() })
     }
-    return json(unread)
+    return call.method === 'POST' ? answerSend() : json(unread)
   })
   return { fetch, calls, warn }
 }
@@ -273,6 +300,29 @@ describe('microsoft graph provider: unread threads', () => {
     expect(batchCalls(graph.calls)).toHaveLength(2)
   })
 
+  it('reads where replies should go, when the sender set it', async () => {
+    expect.hasAssertions()
+    const graph = fakeGraph()
+
+    const [vendor, newsletter] = await createMicrosoftProvider({
+      fetch: graph.fetch,
+    }).listUnreadThreads(connection(), { limit: 2 })
+
+    const conversation = batchCalls(graph.calls)
+      .flatMap(call => innerRequests(call.body))
+      .find(request => request.id.startsWith('conversation'))
+    expect(
+      new URL(conversation?.url ?? '', 'https://graph.microsoft.com').searchParams
+        .get('$select')
+        ?.split(','),
+    ).toContain('replyTo')
+    expect(vendor?.messages.map(message => message.replyTo)).toStrictEqual([[], [], []])
+    expect(newsletter?.messages[0].replyTo).toStrictEqual([
+      { name: 'Operator Weekly Editors', email: 'editors@operatorweekly.com' },
+      { name: 'Nameless', email: '' },
+    ])
+  })
+
   it('turns an HTML body into text when Graph sends one despite asking for text', async () => {
     expect.hasAssertions()
     const html = {
@@ -396,6 +446,25 @@ describe('microsoft graph provider: errors', () => {
     ).rejects.toMatchObject({ kind: 'unavailable' })
   })
 
+  it.each([
+    ['200 with a length of 0', httpStatus.ok],
+    ['204', httpStatus.noContent],
+    ['202', httpStatus.accepted],
+  ])('does not take a listing answered with %s as an empty inbox', async (_, status) => {
+    expect.hasAssertions()
+    const empty = vi.fn<typeof globalThis.fetch>(
+      async () =>
+        new Response(status === httpStatus.noContent ? undefined : '', {
+          status,
+          headers: { 'Content-Length': '0' },
+        }),
+    )
+
+    await expect(
+      createMicrosoftProvider({ fetch: empty }).listUnreadThreads(connection(), { limit: 1 }),
+    ).rejects.toMatchObject({ kind: 'unavailable' })
+  })
+
   it('reports Graph as unavailable when the answer stalls or is not JSON', async () => {
     expect.hasAssertions()
     const stalled = vi.fn<typeof globalThis.fetch>(
@@ -421,7 +490,32 @@ describe('microsoft graph provider: errors', () => {
     ).rejects.toMatchObject({ kind: 'unavailable' })
     await expect(
       createMicrosoftProvider({ fetch: garbled }).listUnreadThreads(connection(), { limit: 1 }),
+    ).rejects.toMatchObject({
+      kind: 'unavailable',
+      message: 'Microsoft Graph answered 200 without JSON',
+    })
+  })
+
+  it('does not take a listing without a list of messages as an empty inbox', async () => {
+    expect.hasAssertions()
+    const graph = fakeGraph({ unread: {} })
+
+    await expect(
+      createMicrosoftProvider({ fetch: graph.fetch }).listUnreadThreads(connection(), { limit: 1 }),
     ).rejects.toMatchObject({ kind: 'unavailable' })
+    expect(batchCalls(graph.calls)).toHaveLength(0)
+  })
+
+  it('logs what Graph said when it refused a read', async () => {
+    expect.hasAssertions()
+    const graph = fakeGraph({ status: () => httpStatus.tooManyRequests })
+
+    await expect(
+      createMicrosoftProvider({ fetch: graph.fetch }).listUnreadThreads(connection(), { limit: 1 }),
+    ).rejects.toMatchObject({
+      kind: 'unavailable',
+      message: 'Microsoft Graph answered 429 Forced (request-id unknown)',
+    })
   })
 })
 
@@ -528,5 +622,229 @@ describe('microsoft graph provider: read state', () => {
 
     await expect(failing).rejects.toMatchObject({ kind: 'unavailable' })
     await expect(next).resolves.toBeUndefined()
+  })
+})
+
+const lena: Inbox.Participant = { name: 'Lena Hartmann', email: 'lena.hartmann@northwind.co' }
+const priya: Inbox.Participant = { name: 'Priya Nair', email: 'priya.nair@northwind.co' }
+const jonas: Inbox.Participant = { name: 'Jonas Weber', email: 'jonas.weber@northwind.co' }
+const outgoingReply: Mail.OutgoingReply = {
+  messageId: 'AAkALg/lena-3',
+  body: 'Hi Lena,\n\nThursday <14:00> works.\nSee you.',
+  to: [lena],
+  cc: [priya],
+}
+const outgoingForward: Mail.OutgoingForward = { messageId: 'lena-3', to: [jonas], note: '' }
+
+/** A Graph that answers sends with these statuses in turn, then with `202 Accepted`. */
+function graphAnswering(...statuses: number[]) {
+  return fakeGraph({ answerSend: () => sendAnswer(statuses.shift()) })
+}
+
+describe('microsoft graph provider: sending', () => {
+  it('replies to exactly the given recipients, with the text as an HTML comment', async () => {
+    expect.hasAssertions()
+    const graph = fakeGraph()
+
+    await expect(
+      createMicrosoftProvider({ fetch: graph.fetch }).reply(connection(), outgoingReply),
+    ).resolves.toBeUndefined()
+
+    expect(
+      graph.calls.map(call => ({
+        method: call.method,
+        url: call.url.href,
+        contentType: call.headers.get('Content-Type'),
+        authorization: call.headers.get('Authorization'),
+      })),
+    ).toStrictEqual([
+      {
+        method: 'POST',
+        url: 'https://graph.microsoft.com/v1.0/me/messages/AAkALg%2Flena-3/reply',
+        contentType: 'application/json',
+        authorization: 'Bearer stored-token',
+      },
+    ])
+    expect(graph.calls[0]?.headers.get('Prefer')).toMatch(IMMUTABLE_IDS)
+    expect(graph.calls[0]?.body).toStrictEqual({
+      comment: '<p>Hi Lena,</p><p>Thursday &lt;14:00&gt; works.<br>See you.</p>',
+      message: {
+        toRecipients: [{ emailAddress: { name: 'Lena Hartmann', address: lena.email } }],
+        ccRecipients: [{ emailAddress: { name: 'Priya Nair', address: priya.email } }],
+      },
+    })
+  })
+
+  it('forwards the message to the recipient with the note as an HTML comment', async () => {
+    expect.hasAssertions()
+    const graph = fakeGraph()
+    const provider = createMicrosoftProvider({ fetch: graph.fetch })
+
+    await provider.forward(connection(), { ...outgoingForward, note: 'Over to you.' })
+    await provider.forward(connection(), outgoingForward)
+
+    const toRecipients = [{ emailAddress: { name: 'Jonas Weber', address: jonas.email } }]
+    expect(graph.calls.map(call => [call.url.pathname, call.body])).toStrictEqual([
+      ['/v1.0/me/messages/lena-3/forward', { comment: '<p>Over to you.</p>', toRecipients }],
+      ['/v1.0/me/messages/lena-3/forward', { comment: '', toRecipients }],
+    ])
+    expect(graph.calls[0]?.headers.get('Prefer')).toMatch(IMMUTABLE_IDS)
+  })
+
+  it.each([
+    ['202 without a body', () => sendAnswer(httpStatus.accepted)],
+    ['204', () => sendAnswer(httpStatus.noContent)],
+    [
+      '202 with an empty body and a length of 0',
+      () => new Response('', { status: httpStatus.accepted, headers: { 'Content-Length': '0' } }),
+    ],
+    ['200 with a body that is not JSON', () => new Response('<html>', { status: httpStatus.ok })],
+  ])("takes Graph's %s as sent, without reading the body", async (_, answerSend) => {
+    expect.hasAssertions()
+    const graph = fakeGraph({ answerSend })
+
+    await expect(
+      createMicrosoftProvider({ fetch: graph.fetch }).reply(connection(), outgoingReply),
+    ).resolves.toBeUndefined()
+  })
+
+  it('refreshes the token once when Graph refuses it, and sends only once', async () => {
+    expect.hasAssertions()
+    const graph = graphAnswering(httpStatus.unauthorized)
+    const mailbox = connection()
+
+    await createMicrosoftProvider({ fetch: graph.fetch }).reply(mailbox, outgoingReply)
+
+    expect(mailbox.accessToken).toHaveBeenLastCalledWith({ force: true })
+    expect(graph.calls.map(call => call.headers.get('Authorization'))).toStrictEqual([
+      'Bearer stored-token',
+      'Bearer refreshed-token',
+    ])
+  })
+
+  it('asks to sign in again when Graph refuses the refreshed token too', async () => {
+    expect.hasAssertions()
+    const graph = graphAnswering(httpStatus.unauthorized, httpStatus.unauthorized)
+
+    await expect(
+      createMicrosoftProvider({ fetch: graph.fetch }).reply(connection(), outgoingReply),
+    ).rejects.toMatchObject({ kind: 'reconnect' })
+    expect(graph.calls).toHaveLength(2)
+  })
+
+  it('asks to sign in again when the permission to send is missing, without trying again', async () => {
+    expect.hasAssertions()
+    const graph = fakeGraph({
+      answerSend: () => sendAnswer(httpStatus.forbidden, 'ErrorAccessDenied'),
+    })
+
+    await expect(
+      createMicrosoftProvider({ fetch: graph.fetch }).forward(connection(), outgoingForward),
+    ).rejects.toMatchObject({ kind: 'reconnect' })
+    expect(graph.calls).toHaveLength(1)
+  })
+
+  it('reports any other refusal to send as nothing sent, with what Graph said for the log', async () => {
+    expect.hasAssertions()
+    const graph = fakeGraph({
+      answerSend: () => sendAnswer(httpStatus.forbidden, 'ErrorMessageSubmissionBlocked'),
+    })
+
+    const failure = createMicrosoftProvider({ fetch: graph.fetch }).reply(
+      connection(),
+      outgoingReply,
+    )
+
+    await expect(failure).rejects.toMatchObject({
+      kind: 'unavailable',
+      message:
+        'Microsoft Graph refused a send with 403 ErrorMessageSubmissionBlocked: Refused by the test (request-id request-7)',
+    })
+  })
+
+  it.each([
+    httpStatus.badRequest,
+    httpStatus.notFound,
+    httpStatus.tooManyRequests,
+    httpStatus.serviceUnavailable,
+  ])('reports nothing sent when Graph refused the send with %i', async status => {
+    expect.hasAssertions()
+    const graph = graphAnswering(status)
+
+    await expect(
+      createMicrosoftProvider({ fetch: graph.fetch }).reply(connection(), outgoingReply),
+    ).rejects.toMatchObject({ kind: 'unavailable' })
+    expect(graph.calls).toHaveLength(1)
+  })
+
+  it.each([httpStatus.internalServerError, httpStatus.badGateway, httpStatus.gatewayTimeout])(
+    'reports the send as unconfirmed when Graph failed with %i',
+    async status => {
+      expect.hasAssertions()
+      const graph = graphAnswering(status)
+
+      await expect(
+        createMicrosoftProvider({ fetch: graph.fetch }).reply(connection(), outgoingReply),
+      ).rejects.toMatchObject({ kind: 'uncertain' })
+      expect(graph.calls).toHaveLength(1)
+    },
+  )
+
+  it('reports the send as unconfirmed when Graph does not answer, or not in time', async () => {
+    expect.hasAssertions()
+    const unreachable = vi
+      .fn<typeof globalThis.fetch>()
+      .mockRejectedValue(new TypeError('fetch failed'))
+    const silent = vi.fn<typeof globalThis.fetch>(
+      (_, init) =>
+        new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => {
+            reject(init.signal?.reason)
+          })
+        }),
+    )
+
+    await expect(
+      createMicrosoftProvider({ fetch: unreachable }).reply(connection(), outgoingReply),
+    ).rejects.toMatchObject({ kind: 'uncertain' })
+    await expect(
+      createMicrosoftProvider({ fetch: silent, timeoutMs: 5 }).forward(
+        connection(),
+        outgoingForward,
+      ),
+    ).rejects.toMatchObject({ kind: 'uncertain' })
+    // Never tried again: Graph may have sent it
+    expect([unreachable.mock.calls.length, silent.mock.calls.length]).toStrictEqual([1, 1])
+  })
+
+  // Without the serialization the reply reaches Graph while the batch is still running
+  it('waits for a call to the same mailbox that is still running', async () => {
+    expect.hasAssertions()
+    const gate = Promise.withResolvers<undefined>()
+    const graph = fakeGraph({ answer: () => ({ status: httpStatus.ok }) })
+    const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+      // The first call, the batch, waits for the gate
+      if (fetch.mock.calls.length === 1) {
+        await gate.promise
+      }
+      return graph.fetch(input, init)
+    })
+    const provider = createMicrosoftProvider({ fetch })
+
+    const marking = provider.setRead(connection(), ['earlier'], true)
+    const replying = provider.reply(connection(), outgoingReply)
+    await vi.waitFor(() =>
+      expect(fetch).toHaveBeenCalledExactlyOnceWith(
+        'https://graph.microsoft.com/v1.0/$batch',
+        expect.anything(),
+      ),
+    )
+    gate.resolve(undefined)
+    await Promise.all([marking, replying])
+
+    expect(graph.calls.map(call => call.url.pathname)).toStrictEqual([
+      '/v1.0/$batch',
+      '/v1.0/me/messages/AAkALg%2Flena-3/reply',
+    ])
   })
 })

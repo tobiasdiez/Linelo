@@ -124,7 +124,7 @@ describe('sign-in', () => {
 
     await visit('/sign-in?reason=reconnect', { signedIn: true }, async () => {
       await expect
-        .element(page.getByText('Sign in again so Linelo can keep reading your mail.'))
+        .element(page.getByText('Sign in again so Linelo can keep working with your mail.'))
         .toBeVisible()
     })
   })

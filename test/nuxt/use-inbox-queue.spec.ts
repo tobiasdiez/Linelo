@@ -14,9 +14,15 @@ const reply: Inbox.TerminalAction = {
 const items = [queueItem({ id: 'a' }), queueItem({ id: 'b' }), queueItem({ id: 'c' })]
 const REFILL_PAGE = useInboxQueue.pageSizes.refill
 
-/** A queue seeded with three items, the same on the server, with spies on the (succeeding) adapters. */
-function freshQueue() {
+/**
+ * A queue seeded with three items, the same on the server, with spies on the
+ * adapters. With `tasks: 'succeed'` the task manager stands in for a connected
+ * Todoist; with `stub` it is the real stub, which fails. Errors the queue logs
+ * are kept out of the test output.
+ */
+function freshQueue({ tasks: taskManager = 'succeed' }: { tasks?: 'succeed' | 'stub' } = {}) {
   vi.restoreAllMocks()
+  vi.spyOn(console, 'error').mockReturnValue()
   const api = fakeInbox.api(items)
   onTestFinished(() => api.restore())
   const mail = useMailActions()
@@ -25,7 +31,11 @@ function freshQueue() {
     sendReply: vi.spyOn(mail, 'sendReply'),
     markAsHandled: vi.spyOn(mail, 'markAsHandled'),
     markAsUnhandled: vi.spyOn(mail, 'markAsUnhandled'),
-    createTask: vi.spyOn(tasks, 'createTask'),
+    createTask:
+      taskManager === 'succeed'
+        ? vi.spyOn(tasks, 'createTask').mockResolvedValue()
+        : vi.spyOn(tasks, 'createTask'),
+    forward: vi.spyOn(mail, 'forward'),
   }
   const queue = useInboxQueue()
   queue.reset(items)
@@ -74,6 +84,43 @@ describe('inbox queue', () => {
 
     await expect(queue.resolve(reply)).resolves.toMatchObject({ followUpFailed: false })
     expect(spies.sendReply).toHaveBeenCalledBefore(spies.createTask)
+  })
+
+  it('reports the follow-up task as failed while Todoist is not connected', async () => {
+    expect.hasAssertions()
+
+    const { queue, api } = freshQueue({ tasks: 'stub' })
+
+    await expect(queue.resolve(reply)).resolves.toMatchObject({ followUpFailed: true })
+    expect(api.replyPosts()).toHaveLength(1)
+    expect(queue.current.value?.thread.id).toBe('b')
+  })
+
+  it('forwards the message and advances', async () => {
+    expect.hasAssertions()
+
+    const { queue, spies, api } = freshQueue()
+    const to = participant('Jonas Weber')
+
+    await expect(queue.resolve({ kind: 'delegate', to, note: '' })).resolves.toMatchObject({
+      item: { thread: { id: 'a' } },
+      followUpFailed: false,
+    })
+    expect(spies.forward).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ id: 'a' }),
+      to,
+      '',
+    )
+    expect(api.forwardPosts()).toStrictEqual([
+      {
+        accountId: items[0]?.thread.accountId,
+        messageId: 'a-message',
+        to: [to],
+        note: '',
+        markAsRead: ['a-message'],
+      },
+    ])
+    expect(queue.current.value?.thread.id).toBe('b')
   })
 
   it('resolves the reply even when its follow-up task fails', async () => {

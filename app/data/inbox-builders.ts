@@ -26,6 +26,7 @@ function message(overrides: Partial<Inbox.Message> = {}): Inbox.Message {
   return {
     id: 'message-1',
     from: participant('Lena Hartmann'),
+    replyTo: [],
     to: [mailboxOwner],
     cc: [],
     sentAt: STORY_NOW.toISOString(),

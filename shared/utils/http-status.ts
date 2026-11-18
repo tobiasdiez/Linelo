@@ -11,15 +11,21 @@ function isSuccess(status: number): boolean {
 const httpStatus = {
   ok: OK,
   created: 201,
+  accepted: 202,
   noContent: 204,
   badRequest: 400,
   unauthorized: 401,
   forbidden: 403,
   notFound: 404,
   conflict: 409,
+  lengthRequired: 411,
+  payloadTooLarge: 413,
+  unsupportedMediaType: 415,
   tooManyRequests: 429,
   internalServerError: 500,
+  badGateway: 502,
   serviceUnavailable: 503,
+  gatewayTimeout: 504,
   isSuccess,
 } as const
 

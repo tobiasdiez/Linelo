@@ -11,7 +11,7 @@ import providerAuth from '../mail/provider-auth'
 const GRAPH_URL = 'https://graph.microsoft.com/v1.0'
 /** Graph's limit of requests per JSON batch. */
 const BATCH_SIZE = 20
-/** A call to Graph that takes longer than this counts as Graph being unavailable. */
+/** A call to Graph that takes longer than this counts as Graph being unavailable (a send: as unconfirmed). */
 const DEFAULT_TIMEOUT_MS = 30_000
 /** How many pages `list` follows when the caller does not say. */
 const DEFAULT_MAX_PAGES = 5
@@ -60,6 +60,22 @@ function nextPage(body: unknown): string | undefined {
     : undefined
 }
 
+/** Graph's JSON error (`{ error: { code, message } }`), as far as a refusal carries one, and its id of the request. */
+function refusalOf({ body, requestId }: Graph.Answer): Graph.Refusal {
+  const error = isRecord(body) && isRecord(body.error) ? body.error : {}
+  return {
+    code: typeof error.code === 'string' ? error.code : undefined,
+    message: typeof error.message === 'string' ? error.message : undefined,
+    requestId,
+  }
+}
+
+/** What Graph said, for the server log: the status, its error code and message, and its id of the request for its support. */
+function said(status: number, { code, message, requestId }: Graph.Refusal): string {
+  const error = `${code ?? '(no code)'}${message ? `: ${message}` : ''}`
+  return `${status} ${error} (request-id ${requestId ?? 'unknown'})`
+}
+
 /** Throws when Graph refused the token for a request inside a batch, so it is refreshed. */
 function assertAuthorized(response: Graph.BatchResponse | undefined): void {
   if (response?.status === httpStatus.unauthorized) {
@@ -104,23 +120,40 @@ function createGraphClient({ fetch, timeoutMs = DEFAULT_TIMEOUT_MS }: Dependenci
     return turn
   }
 
-  /** One call to Graph, body included, within the timeout; any failure to get an answer is `unavailable`. */
+  /**
+   * One call to Graph, body included, within the timeout. Any failure to get an
+   * answer is `unavailable`, or `uncertain` for a send: Graph may have received it.
+   * A refusal is read for Graph's error (for the log); a successful answer for its
+   * JSON body, except a send's (`202 Accepted`, nothing to read).
+   */
   async function call(token: string, path: string, init: Graph.RequestInit): Promise<Graph.Answer> {
+    const response = await fetch(`${GRAPH_URL}${path}`, {
+      method: init.method ?? 'GET',
+      headers: { Authorization: `Bearer ${token}`, ...init.headers },
+      body: init.body === undefined ? undefined : JSON.stringify(init.body),
+      signal: AbortSignal.timeout(timeoutMs),
+    }).catch((error: unknown) => {
+      // No answer, or none in time
+      const kind = init.sendsMail ? 'uncertain' : 'unavailable'
+      throw new MailError(kind, 'Microsoft Graph did not answer', { cause: error })
+    })
+    const { status, ok } = response
+    const requestId = response.headers.get('request-id') ?? undefined
+    if (!ok) {
+      const refusal: unknown = await response.json().catch(() => undefined)
+      return { status, body: refusal, requestId }
+    }
+    if (init.sendsMail) {
+      await response.body?.cancel().catch(() => undefined)
+      return { status, body: undefined, requestId }
+    }
     try {
-      const response = await fetch(`${GRAPH_URL}${path}`, {
-        method: init.method ?? 'GET',
-        headers: { Authorization: `Bearer ${token}`, ...init.headers },
-        body: init.body === undefined ? undefined : JSON.stringify(init.body),
-        signal: AbortSignal.timeout(timeoutMs),
-      })
-      if (!response.ok) {
-        await response.body?.cancel()
-        return { status: response.status, body: undefined }
-      }
-      return { status: response.status, body: parseBody(await response.text()) }
+      return { status, body: parseBody(await response.text()), requestId }
     } catch (error) {
-      // No answer, no answer in time (a stalled body included), or no JSON
-      throw new MailError('unavailable', 'Microsoft Graph did not answer', { cause: error })
+      // Not JSON, or the body stalled until the timeout
+      throw new MailError('unavailable', `Microsoft Graph answered ${status} without JSON`, {
+        cause: error,
+      })
     }
   }
 
@@ -141,13 +174,16 @@ function createGraphClient({ fetch, timeoutMs = DEFAULT_TIMEOUT_MS }: Dependenci
     path: string,
     init: Graph.RequestInit = {},
   ): Promise<unknown> {
-    const { status, body } = await send(caller, path, init)
-    if (!httpStatus.isSuccess(status)) {
-      throw (
-        init.failure?.(status) ?? new MailError('unavailable', `Microsoft Graph answered ${status}`)
-      )
+    const answer = await send(caller, path, init)
+    const { status, body } = answer
+    if (httpStatus.isSuccess(status)) {
+      return body
     }
-    return body
+    const refusal = refusalOf(answer)
+    throw (
+      init.failure?.(status, refusal) ??
+      new MailError('unavailable', `Microsoft Graph answered ${said(status, refusal)}`)
+    )
   }
 
   async function batch(
@@ -199,6 +235,7 @@ const graphClient = {
   query,
   values,
   nextPage,
+  said,
   assertAuthorized,
   assertSucceeded,
 }

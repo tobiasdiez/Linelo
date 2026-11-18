@@ -161,7 +161,7 @@ describe('better auth on the application database', () => {
     expect(info?.user.email).toBe('mara@work.example')
   })
 
-  it('asks Microsoft for mail and calendar access, a refresh token and the account picker', async () => {
+  it('asks Microsoft for mail access, sending, calendar access, a refresh token and the account picker', async () => {
     expect.hasAssertions()
     const { auth } = await setup()
 
@@ -171,7 +171,12 @@ describe('better auth on the application database', () => {
     const query = new URL(url ?? '').searchParams
 
     expect(query.get('scope')?.split(' ')).toStrictEqual(
-      expect.arrayContaining(['Mail.ReadWrite', 'Calendars.ReadWrite', 'offline_access']),
+      expect.arrayContaining([
+        'Mail.ReadWrite',
+        'Mail.Send',
+        'Calendars.ReadWrite',
+        'offline_access',
+      ]),
     )
     expect(query.get('prompt')).toBe('select_account')
   })
