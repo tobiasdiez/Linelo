@@ -1,5 +1,6 @@
 import type { Attachment, Message } from '@microsoft/microsoft-graph-types'
 import MailError from '../mail-error'
+import graphClient from '../../microsoft/graph-client'
 import httpStatus from '#shared/utils/http-status'
 import isRecord from '#shared/utils/is-record'
 import microsoftMessages from './microsoft-messages'
@@ -11,18 +12,13 @@ import providerAuth from '../provider-auth'
  * for the fields it selects and reads.
  */
 
-const GRAPH_URL = 'https://graph.microsoft.com/v1.0'
 /** Message ids that survive moves between folders, so marking as read does not fail after an inbox rule ran. */
 const IMMUTABLE_IDS = 'IdType="ImmutableId"'
 const TEXT_BODIES = 'outlook.body-content-type="text"'
-/** Graph's limit of requests per JSON batch. */
-const BATCH_SIZE = 20
 /** How many of the newest unread inbox messages are looked at to find conversations. */
 const UNREAD_SCAN_SIZE = 50
 /** How many of a conversation's newest messages come with it. */
 const CONVERSATION_SIZE = 25
-/** A call to Graph that takes longer than this counts as Graph being unavailable. */
-const DEFAULT_TIMEOUT_MS = 30_000
 /** Graph requires `$orderby` properties to appear first in `$filter`; this one matches every message. */
 const ANY_TIME = 'receivedDateTime ge 1900-01-01T00:00:00Z'
 const MESSAGE_FIELDS: readonly (keyof Message)[] = [
@@ -46,73 +42,15 @@ const ATTACHMENT_FIELDS: readonly (keyof Attachment)[] = ['id', 'name', 'size', 
 /** Well-known folders whose messages are not shown in a thread. */
 const HIDDEN_FOLDERS = ['deleteditems', 'junkemail']
 
-interface BatchRequest {
-  id: string
-  method: 'GET' | 'PATCH'
-  url: string
-  headers: Record<string, string>
-  body?: unknown
-}
-
-interface BatchResponse {
-  id: string
-  status: number
-  body: unknown
-}
-
-/** Graph's answer: the status, and the parsed body of a successful one. */
-interface GraphAnswer {
-  status: number
-  body: unknown
-}
-
-interface GraphRequestInit {
-  method?: string
-  headers?: Record<string, string>
-  body?: unknown
-}
-
-interface Dependencies {
-  fetch: typeof fetch
-  timeoutMs?: number
-}
-
-/** Who a Graph call is for: the mailbox, and the token to call with. */
-interface Caller {
-  accountId: string
-  token: string
-}
+/** The Graph client to share with the other adapters, or what to create one from. */
+type Dependencies = { graph: Graph.Client } | { fetch: typeof fetch; timeoutMs?: number }
 
 interface Conversations {
   conversationIds: readonly string[]
   hiddenFolderIds: ReadonlySet<string>
 }
 
-/** A query string with `$` options kept literal and values encoded (`%20`, not `+`). */
-function query(parameters: Record<string, string>): string {
-  return Object.entries(parameters)
-    .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
-    .join('&')
-}
-
-function chunks<Item>(items: readonly Item[], size: number): Item[][] {
-  const result: Item[][] = []
-  for (let start = 0; start < items.length; start += size) {
-    result.push(items.slice(start, start + size))
-  }
-  return result
-}
-
-function parseBatchResponses(body: unknown): BatchResponse[] {
-  if (!isRecord(body) || !Array.isArray(body.responses)) {
-    throw new MailError('unavailable', 'Microsoft Graph sent an unexpected batch response')
-  }
-  return body.responses.flatMap(entry =>
-    isRecord(entry) && typeof entry.id === 'string' && typeof entry.status === 'number'
-      ? [{ id: entry.id, status: entry.status, body: entry.body }]
-      : [],
-  )
-}
+const { query, assertAuthorized, assertSucceeded } = graphClient
 
 function unreadInboxUrl(): string {
   return `/me/mailFolders/inbox/messages?${query({
@@ -123,7 +61,7 @@ function unreadInboxUrl(): string {
   })}`
 }
 
-function conversationRequest(conversationId: string, index: number): BatchRequest {
+function conversationRequest(conversationId: string, index: number): Graph.BatchRequest {
   const escaped = conversationId.replaceAll("'", "''")
   return {
     id: `conversation-${index}`,
@@ -140,7 +78,7 @@ function conversationRequest(conversationId: string, index: number): BatchReques
   }
 }
 
-function folderRequest(folder: string): BatchRequest {
+function folderRequest(folder: string): Graph.BatchRequest {
   return {
     id: `folder-${folder}`,
     method: 'GET',
@@ -149,7 +87,7 @@ function folderRequest(folder: string): BatchRequest {
   }
 }
 
-function readStateRequest(messageId: string, index: number, read: boolean): BatchRequest {
+function readStateRequest(messageId: string, index: number, read: boolean): Graph.BatchRequest {
   return {
     id: `message-${index}`,
     method: 'PATCH',
@@ -159,23 +97,7 @@ function readStateRequest(messageId: string, index: number, read: boolean): Batc
   }
 }
 
-/** Throws when Graph refused the token for a request inside a batch, so it is refreshed. */
-function assertAuthorized(response: BatchResponse | undefined): void {
-  if (response?.status === httpStatus.unauthorized) {
-    throw new providerAuth.UnauthorizedError()
-  }
-}
-
-/** Throws for a failed response inside a batch: 401 to refresh the token, anything else as unavailable. */
-function assertSucceeded(response: BatchResponse | undefined, what: string): BatchResponse {
-  assertAuthorized(response)
-  if (!response || !httpStatus.isSuccess(response.status)) {
-    throw new MailError('unavailable', `Microsoft Graph could not ${what} (${response?.status})`)
-  }
-  return response
-}
-
-function folderId(responses: ReadonlyMap<string, BatchResponse>, folder: string): string {
+function folderId(responses: ReadonlyMap<string, Graph.BatchResponse>, folder: string): string {
   const what = `find the ${folder} folder`
   const { body } = assertSucceeded(responses.get(`folder-${folder}`), what)
   if (!isRecord(body) || typeof body.id !== 'string') {
@@ -187,7 +109,7 @@ function folderId(responses: ReadonlyMap<string, BatchResponse>, folder: string)
 /** The threads of the conversations, in their order. A conversation that failed to load is skipped. */
 function toThreads(
   { conversationIds, hiddenFolderIds }: Conversations,
-  responses: ReadonlyMap<string, BatchResponse>,
+  responses: ReadonlyMap<string, Graph.BatchResponse>,
 ): Mail.Thread[] {
   let failures = 0
   const threads = conversationIds.flatMap((_, index) => {
@@ -212,88 +134,13 @@ function toThreads(
 }
 
 /** Creates the Microsoft Graph mail provider. */
-function createMicrosoftProvider({
-  fetch,
-  timeoutMs = DEFAULT_TIMEOUT_MS,
-}: Dependencies): Mail.Provider {
-  /*
-   * Outlook allows about four concurrent requests per mailbox, and one batch
-   * already uses all four, so calls to the same mailbox run one after another.
-   * Per call, not per operation: marking as read waits for at most one batch
-   * of a background refill, not for all of it.
-   */
-  const mailboxQueues = new Map<string, Promise<unknown>>()
+function createMicrosoftProvider(dependencies: Dependencies): Mail.Provider {
+  const { request, batch } =
+    'graph' in dependencies ? dependencies.graph : graphClient.create(dependencies)
   /** Folder ids never change: looked up once per account (only a successful lookup is kept). */
   const hiddenFolders = new Map<string, ReadonlySet<string>>()
 
-  async function exclusive<Result>(accountId: string, run: () => Promise<Result>): Promise<Result> {
-    const turn = (mailboxQueues.get(accountId) ?? Promise.resolve()).then(run)
-    // The next call waits for this one, whether it succeeds or fails
-    mailboxQueues.set(
-      accountId,
-      turn.catch(() => undefined),
-    )
-    return turn
-  }
-
-  /** One call to Graph, body included, within the timeout; any failure to get an answer is `unavailable`. */
-  async function send(token: string, path: string, init: GraphRequestInit): Promise<GraphAnswer> {
-    try {
-      const response = await fetch(`${GRAPH_URL}${path}`, {
-        method: init.method ?? 'GET',
-        headers: { Authorization: `Bearer ${token}`, ...init.headers },
-        body: init.body === undefined ? undefined : JSON.stringify(init.body),
-        signal: AbortSignal.timeout(timeoutMs),
-      })
-      if (!response.ok) {
-        await response.body?.cancel()
-        return { status: response.status, body: undefined }
-      }
-      const body: unknown = await response.json()
-      return { status: response.status, body }
-    } catch (error) {
-      // No answer, no answer in time (a stalled body included), or no JSON
-      throw new MailError('unavailable', 'Microsoft Graph did not answer', { cause: error })
-    }
-  }
-
-  async function request(
-    { accountId, token }: Caller,
-    path: string,
-    init: GraphRequestInit = {},
-  ): Promise<unknown> {
-    const { status, body } = await exclusive(accountId, () => send(token, path, init))
-    if (status === httpStatus.unauthorized) {
-      throw new providerAuth.UnauthorizedError()
-    }
-    if (!httpStatus.isSuccess(status)) {
-      throw new MailError('unavailable', `Microsoft Graph answered ${status}`)
-    }
-    return body
-  }
-
-  /** Runs the requests in batches of 20. Graph answers 200 even when parts fail, so each response is checked on its own. */
-  async function batch(
-    caller: Caller,
-    requests: readonly BatchRequest[],
-  ): Promise<Map<string, BatchResponse>> {
-    const responses = new Map<string, BatchResponse>()
-    for (const part of chunks(requests, BATCH_SIZE)) {
-      // One batch at a time: each already runs four requests in the mailbox
-      // eslint-disable-next-line eslint/no-await-in-loop
-      const body = await request(caller, '/$batch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: { requests: part },
-      })
-      for (const response of parseBatchResponses(body)) {
-        responses.set(response.id, response)
-      }
-    }
-    return responses
-  }
-
-  async function unreadConversationIds(caller: Caller, limit: number): Promise<string[]> {
+  async function unreadConversationIds(caller: Graph.Caller, limit: number): Promise<string[]> {
     const body = await request(caller, unreadInboxUrl(), {
       headers: { Prefer: IMMUTABLE_IDS },
     })
@@ -301,7 +148,7 @@ function createMicrosoftProvider({
     return [...new Set(unread.map(entry => entry.conversationId))].slice(0, limit)
   }
 
-  async function loadThreads(caller: Caller, limit: number): Promise<Mail.Thread[]> {
+  async function loadThreads(caller: Graph.Caller, limit: number): Promise<Mail.Thread[]> {
     const { accountId } = caller
     const conversationIds = await unreadConversationIds(caller, limit)
     if (conversationIds.length === 0) {
