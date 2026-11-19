@@ -1,0 +1,31 @@
+{
+  "@odata.context": "https://graph.microsoft.com/v1.0/$metadata#users('me')/mailFolders('sentitems')/messages(toRecipients,ccRecipients,sentDateTime)",
+  "value": [
+    {
+      "@odata.etag": "W/\"CQAAABYAAAE1\"",
+      "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0A-mara-2",
+      "toRecipients": [
+        { "emailAddress": { "name": "Lena Hartmann", "address": "lena.hartmann@northwind.co" } }
+      ],
+      "ccRecipients": [
+        { "emailAddress": { "name": "Priya Nair", "address": "priya.nair@northwind.co" } }
+      ],
+      "sentDateTime": "2026-10-11T18:00:00Z"
+    },
+    {
+      "@odata.etag": "W/\"CQAAABYAAAE2\"",
+      "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0A-mara-draft",
+      "toRecipients": [],
+      "ccRecipients": [],
+      "sentDateTime": null
+    },
+    {
+      "@odata.etag": "W/\"CQAAABYAAAE3\"",
+      "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0A-mara-1",
+      "toRecipients": [
+        { "emailAddress": { "name": "Jonas Weber", "address": "jonas.weber@northwind.co" } }
+      ],
+      "sentDateTime": "2026-10-09T12:00:00Z"
+    }
+  ]
+}

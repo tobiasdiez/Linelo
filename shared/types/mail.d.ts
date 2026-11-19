@@ -33,14 +33,79 @@ declare namespace Mail {
   /** A forward as the provider sends it. */
   type OutgoingForward = Omit<Inbox.ForwardRequest, 'accountId' | 'markAsRead'>
 
+  /** What a provider lists about a message without loading its thread: its envelope and its own text. */
+  interface Envelope {
+    id: string
+    /** The provider's conversation id: the `id` of the `Thread` it belongs to. */
+    threadId: string
+    from: Inbox.Participant
+    to: Inbox.Participant[]
+    cc: Inbox.Participant[]
+    subject: string
+    /** ISO 8601. */
+    receivedAt: string
+    /** The provider's short plain-text preview of the body (Graph: 255 characters). */
+    preview: string
+    /** The message's own complete text, without quoted history where the provider can tell. */
+    text: string
+    marks: Marks
+  }
+
+  /** What the provider and the mailbox owner marked a message with. */
+  interface Marks {
+    /** Has a List-Unsubscribe header; `undefined` only from a provider that cannot read headers. */
+    unsubscribable?: boolean
+    importance: 'low' | 'normal' | 'high'
+    /** Flagged for follow-up by the mailbox owner. */
+    flagged: boolean
+    /** The provider's own sorting, where it has one (Outlook: Focused or Other). */
+    sorting?: 'focused' | 'other'
+  }
+
+  /** An unread message as the list step sees it: ids and time only. */
+  type ListedMessage = Pick<Envelope, 'id' | 'threadId' | 'receivedAt'>
+
+  /** Which envelopes `listUnread` returns. */
+  interface Listing {
+    /** The most messages to return; fewer only when the mailbox has no more. */
+    limit: number
+    /** Only messages received at or before this time (ISO 8601), to continue from a message. */
+    before?: string
+  }
+
+  /** Whom a sent message went to. */
+  interface SentEnvelope {
+    to: Inbox.Participant[]
+    cc: Inbox.Participant[]
+    /** ISO 8601. */
+    sentAt: string
+  }
+
+  /** What `loadThreads` found. A conversation that failed to load is in neither list. */
+  interface LoadedThreads {
+    /** The threads with something unread, in the order asked for. */
+    threads: Thread[]
+    /** Conversations that loaded with nothing unread left (read or deleted elsewhere). */
+    finished: string[]
+  }
+
   interface Provider {
     /**
      * The scopes an account of this provider needs on top of sign-in to be a mailbox,
      * requested at sign-in. An account that was granted fewer is not a mailbox.
      */
     mailScopes: readonly string[]
-    /** Unread conversations of the inbox, newest unread first, each with its thread. */
-    listUnreadThreads: (connection: Connection, options: { limit: number }) => Promise<Thread[]>
+    /**
+     * The ids of the newest `limit` unread inbox messages, newest first, paged inside the
+     * adapter: fewer only when the inbox has no more unread mail.
+     */
+    listUnreadIds: (connection: Connection, options: { limit: number }) => Promise<ListedMessage[]>
+    /** The envelopes of unread inbox messages with their texts, newest first; fewer than `limit` only at the end. */
+    listUnread: (connection: Connection, listing: Listing) => Promise<Envelope[]>
+    /** The threads of these conversations, in this order. One with nothing unread left is left out of `threads`. */
+    loadThreads: (connection: Connection, threadIds: readonly string[]) => Promise<LoadedThreads>
+    /** The recipients of the newest sent messages, newest first. */
+    listSent: (connection: Connection, options: { limit: number }) => Promise<SentEnvelope[]>
     /** Marks messages read or unread. */
     setRead: (connection: Connection, messageIds: readonly string[], read: boolean) => Promise<void>
     /**

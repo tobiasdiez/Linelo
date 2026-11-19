@@ -189,14 +189,12 @@ watch(
 <template>
   <aside aria-label="Decide" :aria-busy="busy" class="flex flex-col gap-5 lg:sticky lg:top-4">
     <template v-if="mode === 'decide'">
-      <!--
-        Room for three suggestions, so the actions keep their place from one message to the next.
-        Without suggestions (mail is not ranked yet) the actions move up instead of leaving a gap.
-      -->
-      <div v-if="suggestions.length > 0" class="lg:min-h-76">
+      <!-- Without suggestions the actions move up instead of leaving a gap -->
+      <div v-if="suggestions.length > 0">
         <SuggestionList
           ref="suggestionList"
           :suggestions="suggestions"
+          :assisted="item.assisted"
           :busy="busy"
           :pending="showPending ? pressed.suggestionId : undefined"
           @choose="choose"

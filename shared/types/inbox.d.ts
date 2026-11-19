@@ -83,9 +83,13 @@ declare namespace Inbox {
      */
     key: string
     thread: Thread
-    /** One line explaining why this thread is shown now. */
+    /** Why this thread is shown now, in one or two sentences. */
     whyShown: string
     suggestions: Suggestion[]
+    /** The band of its score. Never shown. */
+    tier: Ranking.Tier
+    /** A model's reading is behind the suggestions: they carry the AI badge. */
+    assisted: boolean
   }
 
   type TerminalAction =
@@ -128,10 +132,31 @@ declare namespace Inbox {
     address: Participant
   }
 
-  /** `GET /api/inbox` */
+  /** `GET /api/inbox?limit=&start=` */
   interface InboxResponse {
-    /** Newest unread first. */
+    /** In the order to decide them. */
     items: QueueItem[]
+    /**
+     * Nothing worth showing yet, and a sync could change that (`items` is then empty):
+     * the page asks for the starting batch, or runs the sync to its end.
+     */
+    preparing: boolean
+  }
+
+  /** `POST /api/inbox/sync` */
+  interface SyncRequest {
+    /** The starting batch: the newest 50 unread messages are read and judged first. */
+    start: boolean
+  }
+
+  /**
+   * `POST /api/inbox/sync`: one sync step for each of the user's mailboxes. `done`: nothing is
+   * left to judge in any of them, which includes messages the judge did not answer for (they
+   * keep the rules' score until a later sync asks again); `busy`: another step was working on a
+   * mailbox (another tab), ask again a second later; `more` otherwise.
+   */
+  interface SyncResponse {
+    status: Ranking.StepResult
   }
 
   /** `GET /api/me`: the signed-in user and their mail accounts; `user: null` when signed out. */
@@ -140,7 +165,10 @@ declare namespace Inbox {
     accounts: MailAccount[]
   }
 
-  /** `POST /api/mail/read` */
+  /**
+   * `POST /api/mail/read`: `read` resolves the messages (Mark as handled), `read: false` brings
+   * them back (Undo); both are recorded in the index of unread mail too.
+   */
   interface ReadStateRequest {
     accountId: string
     messageIds: string[]

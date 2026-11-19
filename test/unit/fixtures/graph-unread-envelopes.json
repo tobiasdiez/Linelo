@@ -1,0 +1,105 @@
+{
+  "@odata.context": "https://graph.microsoft.com/v1.0/$metadata#users('me')/mailFolders('inbox')/messages(id,conversationId,receivedDateTime,subject,from,sender,toRecipients,ccRecipients,bodyPreview,importance,inferenceClassification,flag,uniqueBody,body,singleValueExtendedProperties())",
+  "value": [
+    {
+      "@odata.etag": "W/\"CQAAABYAAAD2\"",
+      "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0A-lena-3",
+      "conversationId": "AAQkAGI2-conversation-vendor",
+      "receivedDateTime": "2026-10-12T09:43:00Z",
+      "subject": "RE: Vendor review: can we move sign-off to Thursday?",
+      "from": {
+        "emailAddress": { "name": "Lena Hartmann", "address": "lena.hartmann@northwind.co" }
+      },
+      "sender": {
+        "emailAddress": { "name": "Lena Hartmann", "address": "lena.hartmann@northwind.co" }
+      },
+      "toRecipients": [
+        {
+          "emailAddress": { "name": "Mara Lindqvist", "address": "mara.lindqvist@northwind.co" }
+        }
+      ],
+      "ccRecipients": [
+        { "emailAddress": { "name": "Priya Nair", "address": "priya.nair@northwind.co" } }
+      ],
+      "bodyPreview": "Hi Mara, Does Thursday 14:00 work? Lena",
+      "importance": "normal",
+      "inferenceClassification": "focused",
+      "flag": { "flagStatus": "notFlagged" },
+      "uniqueBody": {
+        "contentType": "text",
+        "content": "Hi Mara,\r\n\r\nDoes Thursday 14:00 work?\r\n\r\nLena"
+      },
+      "body": {
+        "contentType": "text",
+        "content": "Hi Mara,\r\n\r\nDoes Thursday 14:00 work?\r\n\r\nLena\r\n\r\nFrom: Mara Lindqvist\r\nSent: Sunday\r\n> Thanks Lena."
+      }
+    },
+    {
+      "@odata.etag": "W/\"CQAAABYAAAD3\"",
+      "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0A-newsletter-1",
+      "conversationId": "AAQkAGI2-conversation-newsletter",
+      "receivedDateTime": "2026-10-12T08:00:00Z",
+      "subject": "Issue 212: The quiet case for fewer meetings",
+      "from": {
+        "emailAddress": { "name": "Operator Weekly", "address": "hello@operatorweekly.com" }
+      },
+      "sender": {
+        "emailAddress": {
+          "name": "Operator Weekly",
+          "address": "bounce-212@mail.operatorweekly.com"
+        }
+      },
+      "toRecipients": [
+        {
+          "emailAddress": { "name": "Mara Lindqvist", "address": "mara.lindqvist@northwind.co" }
+        }
+      ],
+      "ccRecipients": [],
+      "bodyPreview": "This week: fewer meetings.",
+      "importance": "low",
+      "inferenceClassification": "other",
+      "flag": { "flagStatus": "notFlagged" },
+      "uniqueBody": { "contentType": "text", "content": "" },
+      "body": {
+        "contentType": "text",
+        "content": "This week: fewer meetings.\r\n\r\nRead the full issue online."
+      },
+      "singleValueExtendedProperties": [
+        {
+          "id": "String 0x1045",
+          "value": "<mailto:unsubscribe@operatorweekly.com>, <https://operatorweekly.com/unsubscribe>"
+        }
+      ]
+    },
+    {
+      "@odata.etag": "W/\"CQAAABYAAAD4\"",
+      "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0A-staging-1",
+      "conversationId": "AAQkAGI2-conversation-staging",
+      "receivedDateTime": "2026-10-11T07:15:00Z",
+      "subject": "Staging is back up",
+      "from": {
+        "emailAddress": { "name": "Jonas Weber", "address": "jonas.weber@northwind.co" }
+      },
+      "toRecipients": [
+        {
+          "emailAddress": { "name": "Mara Lindqvist", "address": "mara.lindqvist@northwind.co" }
+        },
+        { "emailAddress": { "name": "Priya Nair", "address": "priya.nair@northwind.co" } }
+      ],
+      "ccRecipients": [],
+      "bodyPreview": "Staging is back up after this morning's database migration.",
+      "importance": "high",
+      "flag": { "flagStatus": "flagged" },
+      "uniqueBody": {
+        "contentType": "html",
+        "content": "<p>Staging is back up after this morning&#39;s database migration.</p>"
+      },
+      "singleValueExtendedProperties": []
+    },
+    {
+      "@odata.etag": "W/\"CQAAABYAAAD5\"",
+      "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0A-incomplete",
+      "subject": "Without a conversation"
+    }
+  ]
+}

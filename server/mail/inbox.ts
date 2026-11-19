@@ -1,7 +1,4 @@
-import latestUnreadMessage from '#shared/utils/latest-unread-message'
-import mailboxLookup from './mailbox-lookup'
-import participants from '#shared/utils/participants'
-import queueItemKey from '#shared/utils/queue-item-key'
+import guards from '#shared/utils/guards'
 
 /** The most threads one request may ask for, about five Graph batch rounds. */
 const MAX_LIMIT = 20
@@ -12,56 +9,14 @@ function parseLimit(value: unknown): number {
   return Number.isInteger(limit) ? Math.min(Math.max(limit, 1), MAX_LIMIT) : MAX_LIMIT
 }
 
-/** One line on why the thread is shown, until ranking exists: newest unread first. */
-function whyShown(thread: Inbox.Thread, mine: readonly Inbox.Participant[]): string {
-  const message = latestUnreadMessage(thread)
-  function includesMe(list: readonly Inbox.Participant[]): boolean {
-    return list.some(entry => mine.some(address => participants.isSameAddress(entry, address)))
-  }
-  if (includesMe(message.to)) {
-    return 'Unread and sent to you directly. Newest mail comes first.'
-  }
-  if (includesMe(message.cc)) {
-    return 'Unread, with you in Cc. Newest mail comes first.'
-  }
-  return 'Unread in your inbox. Newest mail comes first.'
+/** `?start=1` (or `true`) marks the first request of a session. */
+function parseStart(value: unknown): boolean {
+  return value === '1' || value === 'true'
 }
 
-/** The thread of an account as the app sees it: its id made unique across accounts. */
-function inAccount(thread: Mail.Thread, accountId: string): Inbox.Thread {
-  return { ...thread, id: `${accountId}:${thread.id}`, accountId }
-}
-
-function toQueueItem(thread: Inbox.Thread, mine: readonly Inbox.Participant[]): Inbox.QueueItem {
-  return { key: queueItemKey(thread), thread, whyShown: whyShown(thread, mine), suggestions: [] }
-}
-
-/**
- * Asks every mailbox for its unread threads in parallel and merges them, newest
- * unread first. A user without a mailbox (signed in, but mail access not granted)
- * has to sign in again rather than see an empty inbox.
- */
-async function loadInbox(
-  mailboxes: readonly Mail.Mailbox[],
-  { limit }: { limit: number },
-): Promise<Inbox.InboxResponse> {
-  const lists = await Promise.all(
-    mailboxLookup.requireMailboxes(mailboxes).map(async ({ provider, connection }) => {
-      const threads = await provider.listUnreadThreads(connection, { limit })
-      return threads.map(thread => inAccount(thread, connection.account.id))
-    }),
-  )
-  const mine = mailboxes.map(({ connection }) => connection.account.address)
-  const items = lists
-    .flat()
-    .map(thread => toQueueItem(thread, mine))
-    .toSorted(
-      (first, second) =>
-        Date.parse(latestUnreadMessage(second.thread).sentAt) -
-        Date.parse(latestUnreadMessage(first.thread).sentAt),
-    )
-    .slice(0, limit)
-  return { items }
+/** Validates the body of `POST /api/inbox/sync`. */
+function validateSync(body: unknown): Inbox.Validated<Inbox.SyncRequest> {
+  return guards.validate<Inbox.SyncRequest>(body, { start: guards.boolean })
 }
 
 /** The user's mail accounts as the app sees them. */
@@ -73,6 +28,6 @@ function accountsOf(mailboxes: readonly Mail.Mailbox[]): Inbox.MailAccount[] {
   }))
 }
 
-const inbox = { load: loadInbox, parseLimit, accountsOf }
+const inbox = { parseLimit, parseStart, validateSync, accountsOf }
 
 export default inbox

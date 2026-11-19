@@ -204,6 +204,23 @@ describe('inbox queue', () => {
     expect(queue.current.value?.thread.id).toBe('b')
   })
 
+  it('leaves the queue reset when a background refill left for sign-in while an action ran', async () => {
+    expect.hasAssertions()
+
+    const { queue, spies, api } = freshQueue()
+    const gate = Promise.withResolvers<undefined>()
+    spies.markAsHandled.mockReturnValueOnce(gate.promise)
+    const resolving = queue.resolve({ kind: 'handled' })
+    api.inbox.answer = fakeInbox.reconnectResponse
+    await queue.refill()
+
+    gate.resolve(undefined)
+
+    // Nothing follows the action: no check before Inbox zero on the reset queue, which the next visit loads afresh
+    await expect(resolving).resolves.toBeUndefined()
+    expect(queue.status.value).toBe('idle')
+  })
+
   it('refills in the background when two items are left', async () => {
     expect.hasAssertions()
 

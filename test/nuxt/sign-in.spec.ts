@@ -68,6 +68,20 @@ describe('sign-in', () => {
     })
   })
 
+  it('says what is sent to Jev to put the mail in order', async () => {
+    expect.hasAssertions()
+
+    await visit('/sign-in', { signedIn: false }, async () => {
+      await expect
+        .element(
+          page.getByText(
+            "To put your mail in order, Linelo sends the sender's name, the subject and the text of unread messages to Jev, a model run by TypeSafe AI in the United States. TypeSafe does not train on it.",
+          ),
+        )
+        .toBeVisible()
+    })
+  })
+
   it('takes the signed-in user and their mail accounts from the server', async () => {
     expect.hasAssertions()
     const session = { user: { name: 'Lena Hartmann', email: 'lena@northwind.co' } }

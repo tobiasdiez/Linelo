@@ -16,6 +16,8 @@ interface QueueItemOverrides {
   messages?: [Inbox.Message, ...Inbox.Message[]]
   whyShown?: string
   suggestions?: Inbox.Suggestion[]
+  tier?: Inbox.QueueItem['tier']
+  assisted?: boolean
 }
 
 function participant(name: string): Inbox.Participant {
@@ -42,11 +44,13 @@ function queueItem({
   accountId = fixtureAccount.id,
   subject = 'Vendor review',
   messages = [message({ id: `${id}-message` })],
-  whyShown = 'A direct ask with a deadline.',
+  whyShown = 'Reads like it asks you for an answer. Sent to you alone.',
   suggestions = [],
+  tier = 'normal',
+  assisted = false,
 }: QueueItemOverrides = {}): Inbox.QueueItem {
   const thread = { id, accountId, subject, messages }
-  return { key: queueItemKey(thread), thread, whyShown, suggestions }
+  return { key: queueItemKey(thread), thread, whyShown, suggestions, tier, assisted }
 }
 
 /** A queue item from the app fixtures, with timestamps relative to `STORY_NOW`. */

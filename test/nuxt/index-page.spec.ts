@@ -39,6 +39,12 @@ const TWO_FAILURES_AND_A_SEND = 3
 const AFTER_OTHER_TOASTS_CLOSED_MS = 4500
 const UNCONFIRMED_REPLY = "Outlook didn't confirm the reply. Check Sent Items before sending again."
 const { first: FIRST_PAGE, refill: REFILL_PAGE } = useInboxQueue.pageSizes
+/** A refill, a sync call and a refill after the first paint, besides any first load. */
+const SYNCED_AFTER_FIRST_PAINT = 3
+/** What the sync waits before it asks a busy or failing mailbox again, here (a second in the app). */
+const RETRY_MS = 10
+/** Ten busy answers in a row end a sync call. */
+const MAX_BUSY = 10
 
 /**
  * Signs in, seeds the queue (or leaves it to the page to load when `items` is
@@ -53,9 +59,12 @@ async function withInbox(
   }: { server?: Inbox.QueueItem[]; prepare?: (api: FakeInboxApi) => void } = {},
 ): Promise<void> {
   vi.restoreAllMocks()
+  useInboxSync.timing.retryAfterMs = RETRY_MS
   const api = fakeInbox.api(server)
   prepare?.(api)
   useCurrentUser().set(signedInUser)
+  // A new session: no sync ran yet
+  clearNuxtState([stateKeys.inboxSyncedAt, stateKeys.inboxQueueRefilled], { reset: true })
   if (items) {
     useInboxQueue().reset(items)
   } else {
@@ -166,6 +175,8 @@ describe('inbox page', () => {
           read: false,
         }),
       )
+      // The index lists again, in case a listing removed the message meanwhile
+      await vi.waitFor(() => expect(api.mailboxRequests().at(-1)).toStrictEqual(syncCall()))
     })
   })
 
@@ -686,6 +697,420 @@ describe('inbox page', () => {
 
     await withInbox([], async () => {
       await expect.element(heading()).toHaveTextContent('Inbox zero.')
+    })
+  })
+})
+
+/** The queue's answer when nothing is worth showing yet. */
+const PREPARING: Inbox.InboxResponse = { items: [], preparing: true }
+const DONE: Inbox.SyncResponse = { status: 'done' }
+const MORE: Inbox.SyncResponse = { status: 'more' }
+const BUSY: Inbox.SyncResponse = { status: 'busy' }
+const newsletter = queueItem({
+  id: 'newsletter',
+  subject: 'Issue 212',
+  whyShown: 'A newsletter or mailing list. Nothing in it should need an answer.',
+  suggestions: [{ kind: 'handled', id: 'handled', label: 'Nothing to act on' }],
+  tier: 'low',
+  messages: [message({ id: 'newsletter-1' })],
+})
+
+function inboxRequest(limit: number, start = false) {
+  return { kind: 'inbox', limit: String(limit), start }
+}
+
+function syncCall(start = false) {
+  return { kind: 'sync', start }
+}
+
+describe('inbox page: the order of the queue', () => {
+  it('reads the newest mail first when nothing is worth showing, then shows the best of it', async () => {
+    expect.hasAssertions()
+    const batch = Promise.withResolvers<Inbox.SyncResponse>()
+
+    await withInbox(
+      undefined,
+      async api => {
+        await expect.element(heading()).toHaveTextContent('Checking for new mail.')
+        await vi.waitFor(() => expect(api.mailboxRequests().at(-1)).toStrictEqual(syncCall(true)))
+
+        batch.resolve(MORE)
+
+        await expect.element(heading()).toHaveTextContent('First thread')
+        // The sync carries on behind the page, and the queue follows it
+        await vi.waitFor(() =>
+          expect(api.mailboxRequests()).toStrictEqual([
+            inboxRequest(FIRST_PAGE, true),
+            syncCall(true),
+            inboxRequest(FIRST_PAGE),
+            inboxRequest(REFILL_PAGE),
+            syncCall(),
+            inboxRequest(REFILL_PAGE),
+          ]),
+        )
+      },
+      {
+        prepare: api => {
+          api.inbox.answer = ({ start }) => (start ? PREPARING : [first, second])
+          api.sync.answer = ({ start }) => (start ? batch.promise : DONE)
+        },
+      },
+    )
+  })
+
+  it('syncs to the end before showing anything when the newest mail held nothing either', async () => {
+    expect.hasAssertions()
+    let synced = false
+
+    await withInbox(
+      undefined,
+      async api => {
+        await expect.element(heading()).toHaveTextContent('Third thread')
+
+        const beforeTheFirstMessage = [
+          inboxRequest(FIRST_PAGE, true),
+          syncCall(true),
+          inboxRequest(FIRST_PAGE),
+          syncCall(),
+          inboxRequest(FIRST_PAGE),
+        ]
+        expect(api.mailboxRequests().slice(0, beforeTheFirstMessage.length)).toStrictEqual(
+          beforeTheFirstMessage,
+        )
+      },
+      {
+        prepare: api => {
+          api.inbox.answer = () => (synced ? [third] : PREPARING)
+          api.sync.answer = ({ start }) => {
+            synced ||= !start
+            return start ? MORE : DONE
+          }
+        },
+      },
+    )
+  })
+
+  it('offers to try again when reading the newest mail failed, and carries on from there', async () => {
+    expect.hasAssertions()
+    vi.spyOn(console, 'error').mockReturnValue()
+    let batches = 0
+
+    await withInbox(
+      undefined,
+      async api => {
+        await expect.element(heading()).toHaveTextContent("Your inbox didn't load.")
+
+        await page.getByRole('button', { name: 'Try again' }).click()
+
+        await expect.element(heading()).toHaveTextContent('First thread')
+        expect(api.mailboxRequests().filter(request => request.start)).toStrictEqual([
+          inboxRequest(FIRST_PAGE, true),
+          syncCall(true),
+          inboxRequest(FIRST_PAGE, true),
+          syncCall(true),
+        ])
+      },
+      {
+        prepare: api => {
+          api.inbox.answer = ({ start }) => (start ? PREPARING : [first])
+          api.sync.answer = ({ start }) => {
+            if (!start) {
+              return DONE
+            }
+            batches += 1
+            return batches === 1 ? fakeInbox.unavailableResponse() : MORE
+          }
+        },
+      },
+    )
+  })
+
+  it('shows a message at once when there is one worth showing, then refills, syncs and refills', async () => {
+    expect.hasAssertions()
+
+    await withInbox(
+      undefined,
+      async api => {
+        await expect.element(heading()).toHaveTextContent('First thread')
+
+        await vi.waitFor(() =>
+          expect(api.mailboxRequests()).toStrictEqual([
+            inboxRequest(FIRST_PAGE, true),
+            inboxRequest(REFILL_PAGE),
+            syncCall(),
+            inboxRequest(REFILL_PAGE),
+          ]),
+        )
+      },
+      { server: [first, second] },
+    )
+  })
+
+  it('never lets a refill and a sync call run at the same time', async () => {
+    expect.hasAssertions()
+    const slowSync = Promise.withResolvers<Inbox.SyncResponse>()
+
+    await withInbox(
+      [first, second, third],
+      async api => {
+        await vi.waitFor(() => expect(api.mailboxRequests().at(-1)).toStrictEqual(syncCall()))
+        // Two left: a refill is due at once, while the sync call still runs
+        await userEvent.keyboard('h')
+        await expect.element(heading()).toHaveTextContent('Second thread')
+
+        slowSync.resolve(DONE)
+
+        // The refill went out only after the sync call ended (one refill serves both triggers);
+        // Had it not waited, the fake would count an overlap
+        await vi.waitFor(() =>
+          expect(api.mailboxRequests()).toStrictEqual([
+            inboxRequest(REFILL_PAGE),
+            syncCall(),
+            inboxRequest(REFILL_PAGE),
+          ]),
+        )
+        expect(api.overlaps()).toBe(0)
+      },
+      {
+        prepare: api => {
+          api.sync.answer = () => slowSync.promise
+        },
+      },
+    )
+  })
+
+  it('suggests Mark as handled on a newsletter, and 1 resolves it', async () => {
+    expect.hasAssertions()
+
+    await withInbox([newsletter, second], async api => {
+      await expect.element(page.getByText('Nothing to act on')).toBeVisible()
+      await expect.element(page.getByText('Mark handled')).toBeVisible()
+
+      await userEvent.keyboard('1')
+
+      await expect.element(heading()).toHaveTextContent('Second thread')
+      expect(api.readPosts()).toStrictEqual([
+        { accountId: account.id, messageIds: ['newsletter-1'], read: true },
+      ])
+    })
+  })
+
+  it('syncs and refills after an action once the last sync is two minutes old', async () => {
+    expect.hasAssertions()
+
+    const fourth = queueItem({ id: 'fourth', subject: 'Fourth thread' })
+
+    // More than two left after each action, so no refill is due for that
+    await withInbox([first, second, third, fourth, newsletter], async api => {
+      await vi.waitFor(() => expect(api.mailboxRequests()).toHaveLength(SYNCED_AFTER_FIRST_PAINT))
+      await userEvent.keyboard('h')
+      await expect.element(heading()).toHaveTextContent('Second thread')
+      const fresh = api.mailboxRequests().length
+      useState<number | undefined>(stateKeys.inboxSyncedAt).value =
+        Date.now() - useInboxSync.staleAfterMs - 1
+
+      await userEvent.keyboard('h')
+
+      await expect.element(heading()).toHaveTextContent('Third thread')
+      await vi.waitFor(() =>
+        expect(api.mailboxRequests().slice(fresh)).toStrictEqual([
+          syncCall(),
+          inboxRequest(REFILL_PAGE),
+        ]),
+      )
+      // Right after the first sync, an action started none
+      expect(fresh).toBe(SYNCED_AFTER_FIRST_PAINT)
+    })
+  })
+
+  it('asks again a second later while another tab syncs the mailbox', async () => {
+    expect.hasAssertions()
+    const answers: Inbox.SyncResponse[] = [BUSY]
+
+    await withInbox(
+      [first, second, third],
+      async api => {
+        await vi.waitFor(() =>
+          expect(api.mailboxRequests()).toStrictEqual([
+            inboxRequest(REFILL_PAGE),
+            syncCall(),
+            syncCall(),
+            inboxRequest(REFILL_PAGE),
+          ]),
+        )
+      },
+      {
+        prepare: api => {
+          api.sync.answer = () => answers.shift() ?? DONE
+        },
+      },
+    )
+  })
+
+  it('stops syncing after three failures in a row, and shows no Inbox zero then', async () => {
+    expect.hasAssertions()
+    vi.spyOn(console, 'error').mockReturnValue()
+    const failedSyncs = 3
+
+    await withInbox(
+      [first],
+      async api => {
+        function syncCalls() {
+          return api.mailboxRequests().filter(request => request.kind === 'sync')
+        }
+        await vi.waitFor(() => expect(syncCalls()).toHaveLength(failedSyncs))
+
+        // The next trigger tries again (here the check before Inbox zero): the first run had ended
+        await userEvent.keyboard('h')
+
+        await expect.element(heading()).toHaveTextContent("Your inbox didn't load.")
+        expect(syncCalls()).toHaveLength(2 * failedSyncs)
+      },
+      {
+        prepare: api => {
+          api.sync.answer = fakeInbox.unavailableResponse
+        },
+      },
+    )
+  })
+
+  it('shows Inbox zero only once a sync ran to its end, refilling after each step', async () => {
+    expect.hasAssertions()
+    const lastStep = Promise.withResolvers<Inbox.SyncResponse>()
+
+    await withInbox([first], async api => {
+      await vi.waitFor(() => expect(api.mailboxRequests()).toHaveLength(SYNCED_AFTER_FIRST_PAINT))
+      const steps = [MORE, lastStep.promise]
+      api.sync.answer = () => steps.shift() ?? DONE
+      api.inbox.answer = () => []
+
+      await userEvent.keyboard('h')
+
+      await expect.element(heading()).toHaveTextContent('Checking for new mail.')
+      await vi.waitFor(() =>
+        expect(api.mailboxRequests().slice(SYNCED_AFTER_FIRST_PAINT)).toStrictEqual([
+          syncCall(),
+          inboxRequest(REFILL_PAGE),
+          syncCall(),
+        ]),
+      )
+
+      lastStep.resolve(DONE)
+
+      await expect.element(heading()).toHaveTextContent('Inbox zero.')
+      expect(api.mailboxRequests().at(-1)).toStrictEqual(inboxRequest(REFILL_PAGE))
+    })
+  })
+
+  it('shows new mail at the end of the queue as soon as a sync step found it, while the sync carries on', async () => {
+    expect.hasAssertions()
+    const lastStep = Promise.withResolvers<Inbox.SyncResponse>()
+
+    await withInbox([first], async api => {
+      await vi.waitFor(() => expect(api.mailboxRequests()).toHaveLength(SYNCED_AFTER_FIRST_PAINT))
+      const steps = [MORE, lastStep.promise]
+      api.sync.answer = () => steps.shift() ?? DONE
+      api.inbox.answer = () => [third]
+
+      await userEvent.keyboard('h')
+
+      await expect.element(heading()).toHaveTextContent('Third thread')
+      expect(api.mailboxRequests().at(-1)).toStrictEqual(syncCall())
+      lastStep.resolve(DONE)
+    })
+  })
+
+  it('shows Inbox zero after a quick check without "Checking for new mail." in between', async () => {
+    expect.hasAssertions()
+    const headings: string[] = []
+    const observer = new MutationObserver(() => {
+      const text = document.querySelector('main h1')?.textContent?.trim()
+      if (text && headings.at(-1) !== text) {
+        headings.push(text)
+      }
+    })
+
+    await withInbox([first], async api => {
+      await vi.waitFor(() => expect(api.mailboxRequests()).toHaveLength(SYNCED_AFTER_FIRST_PAINT))
+      api.inbox.answer = () => []
+      observer.observe(document.body, { childList: true, subtree: true, characterData: true })
+
+      await userEvent.keyboard('h')
+
+      await expect.element(heading()).toHaveTextContent('Inbox zero.')
+      observer.disconnect()
+      expect(headings).toStrictEqual(['Inbox zero.'])
+    })
+  })
+
+  it('reads the queue it has when another tab is reading the newest mail, instead of waiting for it', async () => {
+    expect.hasAssertions()
+
+    await withInbox(
+      undefined,
+      async api => {
+        await expect.element(heading()).toHaveTextContent('First thread')
+
+        // One busy answer, then the queue: no second batch
+        const untilShown = [
+          inboxRequest(FIRST_PAGE, true),
+          syncCall(true),
+          inboxRequest(FIRST_PAGE),
+        ]
+        expect(api.mailboxRequests().slice(0, untilShown.length)).toStrictEqual(untilShown)
+        expect(
+          api.mailboxRequests().filter(request => request.kind === 'sync' && request.start),
+        ).toHaveLength(1)
+      },
+      {
+        prepare: api => {
+          // The other tab's step judged the newest mail meanwhile
+          api.inbox.answer = ({ start }) => (start ? PREPARING : [first])
+          api.sync.answer = ({ start }) => (start ? BUSY : DONE)
+        },
+      },
+    )
+  })
+
+  it('offers to try again when the mailbox stays busy, and says when trying again failed too', async () => {
+    expect.hasAssertions()
+    vi.spyOn(console, 'error').mockReturnValue()
+
+    await withInbox(
+      undefined,
+      async api => {
+        await expect.element(heading()).toHaveTextContent("Your inbox didn't load.")
+        expect(api.mailboxRequests().filter(request => request.kind === 'sync')).toHaveLength(
+          MAX_BUSY,
+        )
+
+        await page.getByRole('button', { name: 'Try again' }).click()
+
+        await expect
+          .element(page.getByRole('status').getByText("Still can't reach your mailbox."))
+          .toBeInTheDocument()
+      },
+      {
+        prepare: api => {
+          api.inbox.answer = () => PREPARING
+          api.sync.answer = () => BUSY
+        },
+      },
+    )
+  })
+
+  it('sends nothing when the page comes back to a queue that is full and fresh', async () => {
+    expect.hasAssertions()
+
+    await withInbox([first, second, third, newsletter], async api => {
+      await vi.waitFor(() => expect(api.mailboxRequests()).toHaveLength(SYNCED_AFTER_FIRST_PAINT))
+
+      const again = await renderApp('/')
+      // Anything the page asked for on its return is sent before this request
+      await useInboxSync().exclusive(async () => undefined)
+      await again.unmount()
+
+      expect(api.mailboxRequests()).toHaveLength(SYNCED_AFTER_FIRST_PAINT)
     })
   })
 })

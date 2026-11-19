@@ -4,13 +4,17 @@ import inboxBuilders from '~/data/inbox-builders'
 
 const vendorReview = inboxBuilders.storyItem('thread-vendor-review')
 const offsite = inboxBuilders.storyItem('thread-offsite-venue')
-const unranked = { ...vendorReview, suggestions: [] }
+const newsletter = inboxBuilders.storyItem('thread-newsletter')
+const unranked = { ...vendorReview, suggestions: [], assisted: false }
 </script>
 
 <template>
   <Stories title="Inbox/Decision Rail" :component="DecisionRail">
     <Story title="Decide">
       <DecisionRail class="max-w-96" :item="vendorReview" />
+    </Story>
+    <Story title="Decide Mark as Handled">
+      <DecisionRail class="max-w-96" :item="newsletter" />
     </Story>
     <Story title="Decide Without Suggestions">
       <DecisionRail class="max-w-96" :item="unranked" />

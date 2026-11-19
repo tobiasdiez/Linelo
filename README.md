@@ -51,6 +51,33 @@ Without the Microsoft variables the dev server logs that sign-in with Microsoft 
 
 People of other organisations can only sign in once the app's publisher is verified (Microsoft's risk-based consent blocks unverified multi-tenant apps for them); personal accounts and accounts of the organisation that registered the app work right away. When an organisation requires admin approval, its IT admin grants consent for the app.
 
+## Ranking
+
+The inbox shows one unread message at a time, best first: mail from people you write to, addressed to you, that asks something of you and is time-bound comes first; newsletters and notifications come last, with _Mark as handled_ suggested. The info icon next to the subject says why a message is shown now, from the two reasons that moved it most.
+
+- **Rules** (`server/ranking/score.ts`) always run. They score every message from facts: how it is addressed, your flag in Outlook, the sender's importance mark, Outlook's Focused and Other, a List-Unsubscribe header, automated sender addresses (`no-reply@…`), a few time words in English and German, its age, and your standing with the sender: how often and how recently you wrote to them, from the newest 500 messages in Sent Items, scanned once a day. Mailing lists from senders you never write to stay in the lowest tier, and a message you flagged never sinks.
+- **Jev**, a hosted model by [TypeSafe AI](https://typesafe.ai), answers three questions about the complete text of every unread message: does it ask you to do or answer something, was it sent by a system or to a list, and how soon is something needed. Its confident answers move the score by at most 20 points, urgency only half as much from senders you never write to. _Mark as handled_ is suggested for mailing lists, automated senders and what Jev calls automated, never for a message you flagged; it carries the AI badge where Jev's reading is behind it. When Jev does not answer, the rules' order stands and Jev is asked again ten minutes later at the earliest.
+
+Reading every unread message in full takes longer than a page load, so Linelo keeps an index of the unread mail and syncs it while the inbox is open: in steps of about eight seconds, one at a time per mailbox, newest mail first. A login with nothing ranked worth showing (the first one, or after a finished inbox) reads the newest 50 messages first and shows the best of them after a few seconds; any other login shows a message at once while the sync catches up behind it. Mail is only read while Linelo is open.
+
+What leaves the server: the complete text of every unread Inbox message goes to TypeSafe once (and again when the model version or the questions change), with the sender's name and domain, how the mail is addressed and the subject. No address fields, attachments, earlier messages of the thread or ids. TypeSafe hosts Jev in the United States, does not train on inputs and keeps data "as long as necessary"; zero data retention is an enterprise option. Outside development there is no mode without the model, so a self-hosted Linelo sends the same under its own key. Before anyone other than you uses a hosted instance, put a data processing agreement with TypeSafe in place and name them as a processor.
+
+What is stored: `unread_messages` holds one row per unread message (message and conversation ids, facts, Jev's probabilities, the score, timestamps), `mailbox_profiles` one per mailbox (whom it writes to, as keyed hashes of the addresses, and when it was last scanned, listed and synced). No subject, text or readable address. The hashes are HMAC-SHA-256 with a key derived from `BETTER_AUTH_SECRET`; a new secret rescans Sent Items. A message you resolved in Linelo that the mailbox still lists as unread two minutes later (marked unread again in Outlook, or a reply whose marking as read failed) comes back: the mailbox stays the truth.
+
+| Variable           | Purpose                                                                                                                                                                               |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TYPESAFE_API_KEY` | TypeSafe AI's API key for Jev. Required outside development. Without it the dev server gives the demo mailbox canned answers, ranks other mail by the rules alone and logs that once. |
+| `JEV_MODEL`        | Optional: another Jev version than the pinned `jev-1.14.0`, to try it before the pin changes. Messages judged by another version are judged again by the next syncs.                  |
+
+The inbox API, as the page uses it, one request to the mailbox at a time (Outlook allows about four at once, and a sync step uses them):
+
+1. `GET /api/inbox?limit=4&start=1` on the first request of a session only; `limit` is 1 to 20. With `preparing: true` there is nothing worth showing yet:
+2. `POST /api/inbox/sync` with `{ "start": true }`, the starting batch (the newest 50 messages read and judged), then `GET /api/inbox?limit=4` without `start`.
+3. `POST /api/inbox/sync` with `{ "start": false }` until it answers `{ "status": "done" }`; on `busy` (another tab is syncing the mailbox) a second's wait before asking again. Then `GET /api/inbox?limit=20`, which the page also asks for when two items are left.
+4. After an action, a sync once the last one is two minutes old, then `GET` again; after Undo, a sync, so a message a listing removed meanwhile comes back.
+
+Every sync step that asked Jev logs one line with the number of messages judged and the input tokens they cost. In development the server also logs each item's score and factors, so an odd order can be traced to a factor and the weights changed in `server/ranking/score.ts`. The weights are first guesses, checked against the demo threads (`test/unit/ranking-golden.spec.ts`) and nothing else yet.
+
 ## Calendar
 
 `/calendar` shows the week of the account's main calendar, its default calendar in Outlook, as a list grouped by day. Other calendars are never overlaid. Instead, Linelo suggests their events in place, in the week, one decision each:

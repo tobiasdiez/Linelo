@@ -9,9 +9,13 @@ const newsletter = inboxBuilders.storyItem('thread-newsletter')
 <template>
   <Stories title="Inbox/Suggestion List" :component="SuggestionList">
     <Story title="Three Suggestions">
-      <SuggestionList class="max-w-96" :suggestions="vendorReview.suggestions" />
+      <SuggestionList class="max-w-96" :suggestions="vendorReview.suggestions" assisted />
     </Story>
     <Story title="One Suggestion">
+      <SuggestionList class="max-w-96" :suggestions="newsletter.suggestions" assisted />
+    </Story>
+    <Story title="Without the AI Badge">
+      <!-- By the rules alone, such as a List-Unsubscribe header: no model contributed -->
       <SuggestionList class="max-w-96" :suggestions="newsletter.suggestions" />
     </Story>
   </Stories>
