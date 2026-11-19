@@ -36,10 +36,10 @@ async function visit(
   if (signedIn) {
     useCurrentUser().set(signedInUser)
   }
-  useInboxQueue().reset([inboxItem])
   const api = fakeInbox.api([inboxItem])
   api.me.answer =
     me ?? (() => (session ? { ...session, accounts: [account] } : fakeInbox.signedOutMe()))
+  useInboxQueue().reset([inboxItem])
   const screen = await renderApp(route)
   try {
     await run(api, consoleError)

@@ -2,6 +2,8 @@ import httpStatus from '#shared/utils/http-status'
 import inboxBuilders from '~/data/inbox-builders'
 import isRecord from '#shared/utils/is-record'
 import { registerEndpoint } from '@nuxt/test-utils/runtime'
+import sessionScoped from '~/utils/session-scoped'
+import stateKeys from '~/data/state-keys'
 
 type Answer<Body, Request = undefined> = (
   request: Request,
@@ -46,10 +48,35 @@ interface FakeInboxApi {
   /** How often a queue request or a sync call started while another one was still running. */
   overlaps: () => number
   /**
-   * Lets the queue's requests and sync calls still in flight (and those queued behind
-   * them) land, so they cannot reach the next test, then removes the fake.
+   * Ends the session, answers the queue's requests and sync calls still in flight (and those
+   * queued behind them) and lets them land, so they cannot reach the next test, then removes
+   * the fake.
    */
   restore: () => Promise<void>
+}
+
+/** A sync step that left nothing to judge. */
+const DONE: Inbox.SyncResponse = { status: 'done' }
+
+/**
+ * Starts a new session of the inbox, as a sign-in does, and returns its token: none of the
+ * inbox's state carries over, and nothing an earlier session left in flight can hold up
+ * this one's requests, even when the test before failed half-way.
+ */
+function startSession(): string {
+  const inboxKeys = Object.values(stateKeys).filter(key => key.startsWith('inbox-'))
+  clearNuxtState(inboxKeys, { reset: true })
+  return useState(stateKeys.inboxSession, sessionScoped.newSession).value
+}
+
+/**
+ * Ends `session`, unless a later one runs already (the app left for sign-in, or the next
+ * test began): what of it still runs stops at its next step, and its late answers are dropped.
+ */
+function endSession(session: string): void {
+  if (useState(stateKeys.inboxSession).value === session) {
+    clearNuxtState([stateKeys.inboxSession], { reset: true })
+  }
 }
 
 /** The answer of the API when Linelo lost access to the mailbox. */
@@ -130,24 +157,40 @@ function asInboxResponse(answer: Inbox.QueueItem[] | Inbox.InboxResponse): Inbox
   return Array.isArray(answer) ? { items: answer, preparing: false } : answer
 }
 
-/** Records the mailbox requests, and how often one started while another ran. */
+/**
+ * Records the mailbox requests, and how often one started while another ran. Once closed
+ * (the test is over), every request still waiting for its answer, such as one a test holds
+ * back on a promise it never resolved, gets `whenClosed`, and so does every later one: a
+ * test that failed half-way cannot leave a request open for the next.
+ */
 function mailboxLane() {
   const requests: MailboxRequest[] = []
   const inFlight = new Set<Promise<unknown>>()
   const counts = { active: 0, overlaps: 0 }
-  async function track<Result>(request: MailboxRequest, answer: () => Promise<Result>) {
+  const closing = Promise.withResolvers<undefined>()
+  const state = { closed: false }
+  async function track<Result>(
+    request: MailboxRequest,
+    { answer, whenClosed }: { answer: () => Promise<Result>; whenClosed: () => Result },
+  ) {
     requests.push(request)
     if (counts.active > 0) {
       counts.overlaps += 1
     }
     counts.active += 1
-    const answering = answer()
+    const answering = state.closed
+      ? Promise.resolve(whenClosed())
+      : Promise.race([answer(), closing.promise.then(whenClosed)])
     inFlight.add(answering)
     try {
       return await answering
     } finally {
       counts.active -= 1
     }
+  }
+  function close(): void {
+    state.closed = true
+    closing.resolve(undefined)
   }
   /** Waits until no request has run for a while: answers land, and requests queued behind them are sent and answered too. */
   async function quiet(): Promise<void> {
@@ -160,14 +203,16 @@ function mailboxLane() {
       await settle()
     }
   }
-  return { requests, counts, track, quiet }
+  return { requests, counts, track, close, quiet }
 }
 
 /**
  * Stands in for the inbox API: the server's queue, the sync, and the mail endpoints
- * (read state, reply, forward), recording what the app sent.
+ * (read state, reply, forward), recording what the app sent. It serves one session of the
+ * inbox, which it starts: seed the queue after it.
  */
 function fakeInboxApi(items: Inbox.QueueItem[]): FakeInboxApi {
+  const session = startSession()
   const read = recordedEndpoint('/api/mail/read')
   const reply = recordedEndpoint('/api/mail/reply')
   const forward = recordedEndpoint('/api/mail/forward')
@@ -193,7 +238,10 @@ function fakeInboxApi(items: Inbox.QueueItem[]): FakeInboxApi {
         limit: query.get('limit'),
         start: query.get('start') === '1',
       } as const
-      const answer = await lane.track(request, async () => api.inbox.answer(request))
+      const answer = await lane.track(request, {
+        answer: async () => api.inbox.answer(request),
+        whenClosed: () => [],
+      })
       return answer instanceof Response ? answer : asInboxResponse(answer)
     }),
     registerEndpoint('/api/inbox/sync', {
@@ -201,7 +249,10 @@ function fakeInboxApi(items: Inbox.QueueItem[]): FakeInboxApi {
       handler: async event => {
         const body: unknown = await event.web?.request?.json()
         const start = isRecord(body) && body.start === true
-        return lane.track({ kind: 'sync', start }, async () => api.sync.answer({ start }))
+        return lane.track(
+          { kind: 'sync', start },
+          { answer: async () => api.sync.answer({ start }), whenClosed: () => DONE },
+        )
       },
     }),
     read.unregister,
@@ -222,6 +273,8 @@ function fakeInboxApi(items: Inbox.QueueItem[]): FakeInboxApi {
     mailboxRequests: () => [...lane.requests],
     overlaps: () => lane.counts.overlaps,
     restore: async () => {
+      endSession(session)
+      lane.close()
       await lane.quiet()
       for (const remove of unregister) {
         remove()

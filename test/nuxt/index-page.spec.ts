@@ -45,6 +45,10 @@ const SYNCED_AFTER_FIRST_PAINT = 3
 const RETRY_MS = 10
 /** Ten busy answers in a row end a sync call. */
 const MAX_BUSY = 10
+/** How long a check before Inbox zero stays quiet in the app. */
+const QUIET_CHECK_MS = useInboxQueue.timing.quietCheckMs
+/** Longer than a check against the fake takes, even on a loaded machine. */
+const QUICK_CHECK_MS = 10_000
 
 /**
  * Signs in, seeds the queue (or leaves it to the page to load when `items` is
@@ -60,15 +64,13 @@ async function withInbox(
 ): Promise<void> {
   vi.restoreAllMocks()
   useInboxSync.timing.retryAfterMs = RETRY_MS
+  useInboxQueue.timing.quietCheckMs = QUIET_CHECK_MS
+  // A new session: no sync ran yet, and the queue is empty until seeded
   const api = fakeInbox.api(server)
   prepare?.(api)
   useCurrentUser().set(signedInUser)
-  // A new session: no sync ran yet
-  clearNuxtState([stateKeys.inboxSyncedAt, stateKeys.inboxQueueRefilled], { reset: true })
   if (items) {
     useInboxQueue().reset(items)
-  } else {
-    clearNuxtState([stateKeys.inboxQueue, stateKeys.inboxQueueStatus], { reset: true })
   }
   const screen = await renderApp('/')
   try {
@@ -1015,7 +1017,9 @@ describe('inbox page: the order of the queue', () => {
       await userEvent.keyboard('h')
 
       await expect.element(heading()).toHaveTextContent('Third thread')
-      expect(api.mailboxRequests().at(-1)).toStrictEqual(syncCall())
+      // The sync carries on: its next call goes out once the refill after the step landed
+      await vi.waitFor(() => expect(api.mailboxRequests().at(-1)).toStrictEqual(syncCall()))
+      expect(heading().element()).toHaveTextContent('Third thread')
       lastStep.resolve(DONE)
     })
   })
@@ -1032,6 +1036,8 @@ describe('inbox page: the order of the queue', () => {
 
     await withInbox([first], async api => {
       await vi.waitFor(() => expect(api.mailboxRequests()).toHaveLength(SYNCED_AFTER_FIRST_PAINT))
+      // Quick by the app's measure however long the machine takes, so the timer never fires
+      useInboxQueue.timing.quietCheckMs = QUICK_CHECK_MS
       api.inbox.answer = () => []
       observer.observe(document.body, { childList: true, subtree: true, characterData: true })
 

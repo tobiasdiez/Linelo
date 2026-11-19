@@ -1,5 +1,6 @@
 import type { ComputedRef, Ref } from 'vue'
 import decisionQueue from '#shared/utils/decision-queue'
+import sessionScoped from '~/utils/session-scoped'
 import stateKeys from '~/data/state-keys'
 
 /** The first load: one Graph batch round, so the first thread is in the first paint. */
@@ -8,8 +9,8 @@ const FIRST_PAGE = 4
 const REFILL_PAGE = 20
 /** A refill starts when this few items are left. */
 const REFILL_THRESHOLD = 2
-/** A check before Inbox zero that ends this soon shows nothing in between, so it does not flash. */
-const QUIET_CHECK_MS = 300
+/** A check before Inbox zero that ends this soon shows nothing in between, so it does not flash; the specs set it. */
+const timing = { quietCheckMs: 300 }
 
 /**
  * `idle` before the first load, `failed` when the inbox could not be loaded while
@@ -70,8 +71,14 @@ interface InboxQueueApi {
   reset: (items: readonly Inbox.QueueItem[]) => void
 }
 
-// Client only: the refill and the starting batch in flight, shared by everything that asks for one
-const inFlight: { refill?: Promise<boolean>; preparing?: Promise<void> } = {}
+/** The refill and the starting batch in flight, shared by everything that asks for one. */
+interface InFlight {
+  refill?: Promise<boolean>
+  preparing?: Promise<void>
+}
+
+// Client only: what the current session has in flight; a new session starts with nothing
+const inFlightOf = sessionScoped<InFlight>(() => ({}))
 
 /** The queue of threads waiting for a decision, seeded from the server. */
 function useInboxQueue(): InboxQueueApi {
@@ -81,6 +88,7 @@ function useInboxQueue(): InboxQueueApi {
   const preparing = useState(stateKeys.inboxQueuePreparing, () => false)
   const retried = useState(stateKeys.inboxQueueRetried, () => false)
   const refilled = useState(stateKeys.inboxQueueRefilled, () => false)
+  const session = useState(stateKeys.inboxSession, sessionScoped.newSession)
   // During server rendering, forwards the request's cookie
   const requestFetch = useRequestFetch()
   const sync = useInboxSync()
@@ -90,6 +98,15 @@ function useInboxQueue(): InboxQueueApi {
 
   const current = computed(() => decisionQueue.current(state.value))
   const stillFailing = computed(() => status.value === 'failed' && retried.value)
+
+  /**
+   * Whether the session that sent a request is still the current one. When it ended (it
+   * left for sign-in, which cleared the state), its answer is dropped: nothing of an ended
+   * session comes back into the state of the next.
+   */
+  function stillCurrent(started: string): boolean {
+    return session.value === started
+  }
 
   /** The queue from the server; in the browser after any other request to the mailbox. */
   function fetchInbox(limit: number, { start = false } = {}): Promise<Inbox.InboxResponse> {
@@ -104,9 +121,9 @@ function useInboxQueue(): InboxQueueApi {
     status.value = 'ready'
   }
 
-  /** Reports a failed load, unless the user had to leave for sign-in. */
-  async function failLoading(error: unknown): Promise<void> {
-    if (!(await leaveIfSignedOut(error))) {
+  /** Reports a failed load of the session `started`, unless that session ended or the user had to leave for sign-in. */
+  async function failLoading(error: unknown, started: string): Promise<void> {
+    if (stillCurrent(started) && !(await leaveIfSignedOut(error))) {
       console.error('Loading the inbox failed', error)
       status.value = 'failed'
     }
@@ -114,8 +131,12 @@ function useInboxQueue(): InboxQueueApi {
 
   async function retry(): Promise<void> {
     retried.value ||= status.value === 'failed'
+    const started = session.value
     try {
       const response = await fetchInbox(FIRST_PAGE, { start: true })
+      if (!stillCurrent(started)) {
+        return
+      }
       if (response.preparing) {
         state.value = decisionQueue.refresh(state.value, response.items)
         preparing.value = true
@@ -124,7 +145,7 @@ function useInboxQueue(): InboxQueueApi {
         showQueue(response.items)
       }
     } catch (error) {
-      await failLoading(error)
+      await failLoading(error, started)
     }
   }
 
@@ -135,15 +156,19 @@ function useInboxQueue(): InboxQueueApi {
   }
 
   async function refreshFromServer(): Promise<boolean> {
+    const started = session.value
     try {
       // Read the state only once the list is here: the user may have acted meanwhile
       const { items } = await fetchInbox(REFILL_PAGE)
+      if (!stillCurrent(started)) {
+        return false
+      }
       state.value = decisionQueue.refresh(state.value, items)
       refilled.value = true
       return true
     } catch (error) {
       // Keep the queue as it is; the next trigger tries again
-      if (!(await leaveIfSignedOut(error))) {
+      if (stillCurrent(started) && !(await leaveIfSignedOut(error))) {
         console.error('Refreshing the inbox failed', error)
       }
       return false
@@ -154,10 +179,11 @@ function useInboxQueue(): InboxQueueApi {
     if (import.meta.server) {
       return false
     }
-    inFlight.refill ??= refreshFromServer().finally(() => {
-      inFlight.refill = undefined
+    const flights = inFlightOf(session.value)
+    flights.refill ??= refreshFromServer().finally(() => {
+      flights.refill = undefined
     })
-    return inFlight.refill
+    return flights.refill
   }
 
   /** The sync to its end, then a refill, so better mail found deeper joins after the current item. */
@@ -206,10 +232,11 @@ function useInboxQueue(): InboxQueueApi {
    * on behind the page.
    */
   async function prepare(): Promise<void> {
+    const started = session.value
     status.value = 'checking'
     const response = await firstPage()
     // Not when it left for sign-in, which reset the state
-    if (status.value !== 'checking') {
+    if (!stillCurrent(started) || status.value !== 'checking') {
       return
     }
     if (!response || (response.items.length === 0 && response.preparing)) {
@@ -225,10 +252,12 @@ function useInboxQueue(): InboxQueueApi {
       return
     }
     if (preparing.value) {
-      inFlight.preparing ??= prepare()
-        .catch((error: unknown) => failLoading(error))
+      const started = session.value
+      const flights = inFlightOf(started)
+      flights.preparing ??= prepare()
+        .catch((error: unknown) => failLoading(error, started))
         .finally(() => {
-          inFlight.preparing = undefined
+          flights.preparing = undefined
         })
     } else if (current.value) {
       afterPaint()
@@ -258,16 +287,17 @@ function useInboxQueue(): InboxQueueApi {
 
   /** A check for new mail instead of a flash of Inbox zero; "Checking for new mail." only once it takes a while. */
   async function checkBeforeInboxZero(): Promise<void> {
+    const started = session.value
     status.value = 'waiting'
     const timer = setTimeout(() => {
-      if (status.value === 'waiting') {
+      if (stillCurrent(started) && status.value === 'waiting') {
         status.value = 'checking'
       }
-    }, QUIET_CHECK_MS)
+    }, timing.quietCheckMs)
     const shown = await mailOrSyncEnd()
     clearTimeout(timer)
     // Not when the check left for sign-in, which reset the state
-    if (status.value === 'waiting' || status.value === 'checking') {
+    if (stillCurrent(started) && (status.value === 'waiting' || status.value === 'checking')) {
       status.value = shown ? 'ready' : 'failed'
     }
   }
@@ -399,5 +429,7 @@ function useInboxQueue(): InboxQueueApi {
 
 /** The page sizes, for tests that check what was asked for. */
 useInboxQueue.pageSizes = { first: FIRST_PAGE, refill: REFILL_PAGE } as const
+/** How long a check before Inbox zero stays quiet; the specs set it. */
+useInboxQueue.timing = timing
 
 export default useInboxQueue

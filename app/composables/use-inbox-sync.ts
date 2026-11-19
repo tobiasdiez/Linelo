@@ -1,3 +1,4 @@
+import sessionScoped from '~/utils/session-scoped'
 import stateKeys from '~/data/state-keys'
 
 /** After an action, a sync starts once the last one that ran to its end is older than this. */
@@ -34,17 +35,17 @@ interface InboxSyncApi {
   exclusive: <Result>(request: () => Promise<Result>) => Promise<Result>
 }
 
-// Client only: the last request to the mailbox, the sync in flight, and who waits on its steps
-const lane: {
+/** What one session has going on with the mailbox: its last request, its sync in flight, and who waits on that sync's steps. */
+interface Lane {
   tail: Promise<unknown>
   syncing?: Promise<boolean>
   afterStep: Set<() => Promise<void>>
-} = { tail: Promise.resolve(), afterStep: new Set() }
+}
 
-function exclusive<Result>(request: () => Promise<Result>): Promise<Result> {
-  if (import.meta.server) {
-    return request()
-  }
+// Client only: the lane of the current session; a new session starts with an empty one
+const laneOf = sessionScoped<Lane>(() => ({ tail: Promise.resolve(), afterStep: new Set() }))
+
+function exclusiveIn<Result>(lane: Lane, request: () => Promise<Result>): Promise<Result> {
   const turn = lane.tail.then(request)
   // The next request waits for this one, whether it succeeds or fails
   lane.tail = turn.catch(() => undefined)
@@ -57,17 +58,26 @@ function wait(): Promise<void> {
   })
 }
 
-function post(start: boolean): Promise<Inbox.SyncResponse> {
+function post(lane: Lane, start: boolean): Promise<Inbox.SyncResponse> {
   const body: Inbox.SyncRequest = { start }
-  return exclusive(() => $fetch<Inbox.SyncResponse>('/api/inbox/sync', { method: 'POST', body }))
+  return exclusiveIn(lane, () =>
+    $fetch<Inbox.SyncResponse>('/api/inbox/sync', { method: 'POST', body }),
+  )
 }
 
-/** One sync call; while the mailbox is busy, asks again a second later, ten times at most. */
-async function call(start: boolean, settled?: () => Promise<boolean>): Promise<CallOutcome> {
-  for (let tries = 0; tries < MAX_BUSY; tries += 1) {
+/**
+ * One sync call in the lane; while the mailbox is busy, asks again a second later, ten times
+ * at most, and not once the session `ended`. `settled` may end the wait early.
+ */
+async function call(
+  lane: Lane,
+  start: boolean,
+  { ended, settled }: { ended: () => boolean; settled?: () => Promise<boolean> },
+): Promise<CallOutcome> {
+  for (let tries = 0; tries < MAX_BUSY && !ended(); tries += 1) {
     // Each call waits for the one before
     // eslint-disable-next-line eslint/no-await-in-loop
-    const { status } = await post(start)
+    const { status } = await post(lane, start)
     if (status !== 'busy') {
       return status
     }
@@ -81,9 +91,12 @@ async function call(start: boolean, settled?: () => Promise<boolean>): Promise<C
   return 'busy'
 }
 
-/** Tells whoever waits on the sync's steps that one ended with more to do. */
-async function afterStep(): Promise<void> {
+/** Tells whoever waits on the sync's steps that one ended with more to do, until the session `ended`. */
+async function afterStep(lane: Lane, ended: () => boolean): Promise<void> {
   for (const listener of lane.afterStep) {
+    if (ended()) {
+      return
+    }
     // One after another, each through the lane
     // eslint-disable-next-line eslint/no-await-in-loop
     await listener()
@@ -92,44 +105,69 @@ async function afterStep(): Promise<void> {
 
 /** The sync behind the page, which keeps the index of unread mail in step with the mailbox. */
 function useInboxSync(): InboxSyncApi {
+  const session = useState(stateKeys.inboxSession, sessionScoped.newSession)
   /** When a sync last ran to its end, in this session. */
   const syncedAt = useState<number | undefined>(stateKeys.inboxSyncedAt, () => undefined)
   const { leaveIfSignedOut } = useSignInRedirect()
+
+  function lane(): Lane {
+    return laneOf(session.value)
+  }
+
+  /** Whether the session this lane belongs to ended (it left for sign-in, which cleared it). */
+  function endedFor(own: Lane): () => boolean {
+    return () => lane() !== own
+  }
+
+  function exclusive<Result>(request: () => Promise<Result>): Promise<Result> {
+    return import.meta.server ? request() : exclusiveIn(lane(), request)
+  }
 
   async function startBatch(settled: () => Promise<boolean>): Promise<boolean> {
     if (import.meta.server) {
       return false
     }
+    const own = lane()
+    const ended = endedFor(own)
     try {
-      return (await call(true, settled)) !== 'busy'
+      return (await call(own, true, { ended, settled })) !== 'busy' && !ended()
     } catch (error) {
-      if (!(await leaveIfSignedOut(error))) {
+      // An ended session reports nothing: the user left it already
+      if (!ended() && !(await leaveIfSignedOut(error))) {
         console.error('Reading the newest mail failed', error)
       }
       return false
     }
   }
 
-  /** Steps until `done`; a mailbox that stays busy ends the run quietly, three failures in a row end it too. */
-  async function run(): Promise<boolean> {
+  /**
+   * Steps until `done`; a mailbox that stays busy ends the run quietly, three failures in a
+   * row end it too, and so does the end of its session.
+   */
+  async function run(own: Lane): Promise<boolean> {
+    const ended = endedFor(own)
     let failures = 0
-    while (failures < MAX_FAILURES) {
+    while (failures < MAX_FAILURES && !ended()) {
       try {
         // eslint-disable-next-line eslint/no-await-in-loop
-        const outcome = await call(false)
+        const outcome = await call(own, false, { ended })
+        if (ended()) {
+          return false
+        }
         if (outcome === 'done') {
           syncedAt.value = Date.now()
           return true
         }
-        if (outcome === 'busy') {
+        if (outcome !== 'more') {
           return false
         }
         failures = 0
         // eslint-disable-next-line eslint/no-await-in-loop
-        await afterStep()
+        await afterStep(own, ended)
       } catch (error) {
+        // An ended session reports nothing: the user left it already
         // eslint-disable-next-line eslint/no-await-in-loop
-        if (await leaveIfSignedOut(error)) {
+        if (ended() || (await leaveIfSignedOut(error))) {
           return false
         }
         failures += 1
@@ -148,19 +186,20 @@ function useInboxSync(): InboxSyncApi {
     if (import.meta.server) {
       return Promise.resolve(false)
     }
+    const own = lane()
     if (listener) {
-      lane.afterStep.add(listener)
+      own.afterStep.add(listener)
     }
-    lane.syncing ??= run().finally(() => {
-      lane.syncing = undefined
-      lane.afterStep.clear()
+    own.syncing ??= run(own).finally(() => {
+      own.syncing = undefined
+      own.afterStep.clear()
     })
-    return lane.syncing
+    return own.syncing
   }
 
   function isStale(): boolean {
     const last = syncedAt.value
-    return !lane.syncing && (last === undefined || Date.now() - last > STALE_AFTER_MS)
+    return !lane().syncing && (last === undefined || Date.now() - last > STALE_AFTER_MS)
   }
 
   return { startBatch, untilDone, isStale, exclusive }

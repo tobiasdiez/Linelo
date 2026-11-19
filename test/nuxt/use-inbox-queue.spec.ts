@@ -221,6 +221,27 @@ describe('inbox queue', () => {
     expect(queue.status.value).toBe('idle')
   })
 
+  it('leaves nothing of the inbox behind when a refill lands after leaving for sign-in', async () => {
+    expect.hasAssertions()
+
+    const { queue, api } = freshQueue()
+    const gate = Promise.withResolvers<Inbox.QueueItem[]>()
+    api.inbox.answer = () => gate.promise
+    const refilling = queue.refill()
+    await vi.waitFor(() => expect(api.inboxLimits()).toStrictEqual([String(REFILL_PAGE)]))
+    api.read.answer = fakeInbox.signedOutResponse
+
+    // The session ended: the action leaves for sign-in, which clears the queue
+    await expect(queue.resolve({ kind: 'handled' })).resolves.toBeUndefined()
+    gate.resolve(items)
+
+    const refilled = await refilling
+    expect({ refilled, current: queue.current.value }).toStrictEqual({
+      refilled: false,
+      current: undefined,
+    })
+  })
+
   it('refills in the background when two items are left', async () => {
     expect.hasAssertions()
 

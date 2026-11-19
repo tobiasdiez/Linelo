@@ -6,6 +6,11 @@ const stateKeys = {
   currentUser: 'current-user',
   /** Whether the server was asked who is signed in, so hydration does not ask again. */
   currentUserChecked: 'current-user-checked',
+  /**
+   * Names the session the inbox's work in flight belongs to (`sessionScoped`): clearing it
+   * ends that work, so an answer that arrives later is dropped.
+   */
+  inboxSession: 'inbox-session',
   inboxQueue: 'inbox-queue',
   inboxQueueStatus: 'inbox-queue-status',
   inboxQueueResolving: 'inbox-queue-resolving',
