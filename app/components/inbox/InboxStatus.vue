@@ -2,11 +2,17 @@
 import type { ButtonProps } from '@nuxt/ui'
 import FocusableTitle from '~/utils/focusable-title'
 
-const { state, busy = false } = defineProps<{
+const {
+  state,
+  busy = false,
+  stillFailing = false,
+} = defineProps<{
   /** `checking`: an empty queue looks once more for new mail. `failed`: the inbox did not load. */
   state: 'checking' | 'failed'
   /** True while trying again. */
   busy?: boolean
+  /** "Try again" failed before, also when the status was shown anew since. */
+  stillFailing?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -14,8 +20,8 @@ const emit = defineEmits<{
 }>()
 
 const root = useTemplateRef<HTMLElement>('root')
-/** Trying again failed too; said in a status line, so it does not go unnoticed. */
-const stillFailing = ref(false)
+/** Trying again failed too, while this status was shown; said in a status line, so it does not go unnoticed. */
+const retryFailed = ref(false)
 
 const title = computed(() =>
   state === 'checking' ? 'Checking for new mail.' : "Your inbox didn't load.",
@@ -50,7 +56,7 @@ watch(
     if (isBusy || !wasBusy || state !== 'failed') {
       return
     }
-    stillFailing.value = true
+    retryFailed.value = true
     await nextTick()
     root.value?.querySelector('button')?.focus()
   },
@@ -69,7 +75,9 @@ watch(
       size="xl"
     />
     <p role="status" class="text-center text-sm text-muted">
-      <template v-if="stillFailing && state === 'failed'">Still can't reach your mailbox.</template>
+      <template v-if="(stillFailing || retryFailed) && state === 'failed'">
+        Still can't reach your mailbox.
+      </template>
     </p>
   </div>
 </template>

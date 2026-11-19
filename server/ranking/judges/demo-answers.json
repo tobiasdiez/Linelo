@@ -1,0 +1,61 @@
+{
+  "judge": "jev-1.14.0/1",
+  "answers": {
+    "thread-vendor-review": {
+      "asksMe": 1,
+      "automated": 0.01,
+      "timePressure": {
+        "score": 2.68,
+        "confidence": 0.68
+      }
+    },
+    "thread-offsite-venue": {
+      "asksMe": 0.93,
+      "automated": 0.01,
+      "timePressure": {
+        "score": 2.07,
+        "confidence": 0.82
+      }
+    },
+    "thread-staging": {
+      "asksMe": 0.02,
+      "automated": 0.07,
+      "timePressure": {
+        "score": 0,
+        "confidence": 1
+      }
+    },
+    "thread-migration-plan": {
+      "asksMe": 0.99,
+      "automated": 0.02,
+      "timePressure": {
+        "score": 2.01,
+        "confidence": 0.91
+      }
+    },
+    "thread-newsletter": {
+      "asksMe": 0.1,
+      "automated": 0.98,
+      "timePressure": {
+        "score": 0.39,
+        "confidence": 0.62
+      }
+    },
+    "thread-delivery": {
+      "asksMe": 0.58,
+      "automated": 0.99,
+      "timePressure": {
+        "score": 0.18,
+        "confidence": 0.83
+      }
+    },
+    "thread-scan": {
+      "asksMe": 0.02,
+      "automated": 0.9,
+      "timePressure": {
+        "score": 0.01,
+        "confidence": 1
+      }
+    }
+  }
+}

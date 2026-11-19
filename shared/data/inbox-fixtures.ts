@@ -71,7 +71,9 @@ function vendorReview(ago: (offset: TimeAgo) => string): Inbox.QueueItem {
         },
       ],
     },
-    whyShown: 'A direct ask with a Thursday deadline, from a colleague you work with often.',
+    whyShown: 'Reads like it is needed soon. From someone you have written to.',
+    tier: 'high',
+    assisted: true,
     suggestions: [
       {
         kind: 'reply',
@@ -140,7 +142,9 @@ function offsiteVenue(ago: (offset: TimeAgo) => string): Inbox.QueueItem {
         },
       ],
     },
-    whyShown: 'Priya needs a yes or no before the hold expires on Friday.',
+    whyShown: 'From someone you have written to. Reads like it asks you for an answer.',
+    tier: 'high',
+    assisted: true,
     suggestions: [
       {
         kind: 'reply',
@@ -181,7 +185,9 @@ function stagingUpdate(ago: (offset: TimeAgo) => string): Inbox.QueueItem {
         },
       ],
     },
-    whyShown: 'A short update from Jonas. Nothing in it asks for an answer.',
+    whyShown: 'From someone you have written to.',
+    tier: 'normal',
+    assisted: true,
     suggestions: [
       { kind: 'handled', id: 'staging-handled', label: 'Nothing to do here' },
       {
@@ -250,7 +256,9 @@ function migrationPlan(ago: (offset: TimeAgo) => string): Inbox.QueueItem {
         },
       ],
     },
-    whyShown: 'Marco needs your go-ahead by Monday. It is a long read, so a task may fit better.',
+    whyShown: 'From someone you write to often. Mentions today or a day close by.',
+    tier: 'high',
+    assisted: true,
     suggestions: [
       {
         kind: 'task',
@@ -296,7 +304,9 @@ function newsletterIssue(ago: (offset: TimeAgo) => string): Inbox.QueueItem {
         },
       ],
     },
-    whyShown: 'A newsletter you subscribed to. Nothing in it needs an answer.',
+    whyShown: 'A newsletter or mailing list. Nothing in it should need an answer.',
+    tier: 'low',
+    assisted: true,
     suggestions: [{ kind: 'handled', id: 'newsletter-handled', label: 'Nothing to act on' }],
   })
 }
@@ -322,8 +332,10 @@ function deliveryNotice(ago: (offset: TimeAgo) => string): Inbox.QueueItem {
         },
       ],
     },
-    whyShown: 'A delivery notice. Nothing in it needs an answer.',
-    suggestions: [],
+    whyShown: 'Sent by a system, not a person. Nothing in it should need an answer.',
+    tier: 'low',
+    assisted: true,
+    suggestions: [{ kind: 'handled', id: 'delivery-handled', label: 'Nothing to act on' }],
   })
 }
 
@@ -347,8 +359,10 @@ function printerScan(ago: (offset: TimeAgo) => string): Inbox.QueueItem {
         },
       ],
     },
-    whyShown: 'A scan from the office printer. Nothing in it needs an answer.',
-    suggestions: [],
+    whyShown: 'Sent by a system, not a person. Nothing in it should need an answer.',
+    tier: 'normal',
+    assisted: true,
+    suggestions: [{ kind: 'handled', id: 'scan-handled', label: 'Nothing to act on' }],
   })
 }
 

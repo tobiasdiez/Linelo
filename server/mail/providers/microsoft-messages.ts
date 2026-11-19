@@ -19,6 +19,8 @@ interface GraphMessage {
 }
 
 const UNKNOWN_SENDER: Inbox.Participant = { name: 'Unknown sender', email: '' }
+/** The extended property that holds the List-Unsubscribe header (PidTagListUnsubscribe). */
+const LIST_UNSUBSCRIBE = 'String 0x1045'
 const REPLY_PREFIXES = /^(?:\s*(?:re|fw|fwd|aw|wg)\s*:)+\s*/i
 
 /**
@@ -81,6 +83,16 @@ function attachments(list: NullableOption<Attachment[]> | undefined): Inbox.Atta
   )
 }
 
+/** Who sent the message: `from`, else `sender`. */
+function senderOf(value: Message): Inbox.Participant {
+  return participant(value.from) ?? participant(value.sender) ?? UNKNOWN_SENDER
+}
+
+/** Only the part that is new in this message, the whole body where Graph has none; mail not written in Outlook may still quote history. */
+function ownText(value: Message): string {
+  return plainText(value.uniqueBody) || plainText(value.body)
+}
+
 /** Parses one message of a Graph response, or `undefined` when it lacks what the inbox needs. */
 function parse(value: Message): GraphMessage | undefined {
   const { id, conversationId } = value
@@ -90,13 +102,12 @@ function parse(value: Message): GraphMessage | undefined {
   }
   const message: Inbox.Message = {
     id,
-    from: participant(value.from) ?? participant(value.sender) ?? UNKNOWN_SENDER,
+    from: senderOf(value),
     replyTo: participants(value.replyTo),
     to: participants(value.toRecipients),
     cc: participants(value.ccRecipients),
     sentAt: value.sentDateTime ?? receivedAt,
-    // Only the part that is new in this message; mail not written in Outlook may still quote history
-    body: plainText(value.uniqueBody) || plainText(value.body),
+    body: ownText(value),
     attachments: attachments(value.attachments),
     unread: value.isRead === false,
   }
@@ -110,15 +121,97 @@ function parse(value: Message): GraphMessage | undefined {
   }
 }
 
-/** The messages in a Graph collection response (`{ value: [...] }`). */
+/** The entries of a Graph collection response (`{ value: [...] }`) that are objects, which every message is. */
+function entries(body: unknown): Message[] {
+  return isRecord(body) && Array.isArray(body.value)
+    ? body.value.filter(entry => isMessage(entry))
+    : []
+}
+
+/** The messages in a Graph collection response. */
 function parseList(body: unknown): GraphMessage[] {
-  if (!isRecord(body) || !Array.isArray(body.value)) {
-    return []
-  }
-  return body.value
-    .filter(entry => isMessage(entry))
+  return entries(body)
     .map(entry => parse(entry))
     .filter(entry => entry !== undefined)
+}
+
+/** A message's id, conversation and time, or `undefined` when one is missing. */
+function listedOf({
+  id,
+  conversationId,
+  receivedDateTime,
+}: Message): Mail.ListedMessage | undefined {
+  return id && conversationId && receivedDateTime
+    ? { id, threadId: conversationId, receivedAt: receivedDateTime }
+    : undefined
+}
+
+/** Messages of a listing with their id, conversation and time; others are skipped. */
+function parseListed(body: unknown): Mail.ListedMessage[] {
+  return entries(body)
+    .map(entry => listedOf(entry))
+    .filter(entry => entry !== undefined)
+}
+
+/**
+ * Whether the message has a List-Unsubscribe header. The listing asked for it, so a
+ * message without the extended property has none.
+ */
+function unsubscribable(value: Message): boolean {
+  return (value.singleValueExtendedProperties ?? []).some(
+    property =>
+      property.id?.toLowerCase() === LIST_UNSUBSCRIBE.toLowerCase() &&
+      (property.value ?? '').trim().length > 0,
+  )
+}
+
+function marks(value: Message): Mail.Marks {
+  return {
+    unsubscribable: unsubscribable(value),
+    importance: value.importance ?? 'normal',
+    flagged: value.flag?.flagStatus === 'flagged',
+    sorting: value.inferenceClassification ?? undefined,
+  }
+}
+
+/** One message of a judge page, or `undefined` when it lacks what the ranking needs. */
+function parseEnvelope(value: Message): Mail.Envelope | undefined {
+  const listed = listedOf(value)
+  if (!listed) {
+    return undefined
+  }
+  return {
+    ...listed,
+    from: senderOf(value),
+    to: participants(value.toRecipients),
+    cc: participants(value.ccRecipients),
+    subject: value.subject ?? '',
+    preview: value.bodyPreview ?? '',
+    text: ownText(value),
+    marks: marks(value),
+  }
+}
+
+/** The envelopes of a judge page. */
+function parseEnvelopes(body: unknown): Mail.Envelope[] {
+  return entries(body)
+    .map(entry => parseEnvelope(entry))
+    .filter(entry => entry !== undefined)
+}
+
+/** Whom the sent messages of a listing went to; a message without a time is skipped. */
+function parseSent(body: unknown): Mail.SentEnvelope[] {
+  return entries(body).flatMap(value =>
+    value.sentDateTime
+      ? [
+          {
+            to: participants(value.toRecipients),
+            cc: participants(value.ccRecipients),
+            sentAt: value.sentDateTime,
+          },
+        ]
+      : [],
+  )
 }
 
 /** The subject without reply and forward prefixes, which the thread view does not need. */
@@ -150,6 +243,13 @@ function toThread(
   }
 }
 
-const microsoftMessages = { parseList, toThread }
+const microsoftMessages = {
+  parseList,
+  parseListed,
+  parseEnvelopes,
+  parseSent,
+  toThread,
+  listUnsubscribe: LIST_UNSUBSCRIBE,
+}
 
 export default microsoftMessages

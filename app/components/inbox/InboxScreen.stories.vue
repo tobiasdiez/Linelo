@@ -4,11 +4,12 @@ import inboxBuilders from '~/data/inbox-builders'
 
 const longThread = inboxBuilders.storyItem('thread-migration-plan')
 const vendorReview = inboxBuilders.storyItem('thread-vendor-review')
-// Mail from the mailbox has no suggestions until ranking exists
+// Ranked by the rules alone: a message with nothing to suggest, and no model involved
 const unranked = {
   ...inboxBuilders.storyItem('thread-offsite-venue'),
-  whyShown: 'Unread and sent to you directly. Newest mail comes first.',
+  whyShown: 'From someone you have written to. Sent to you alone.',
   suggestions: [],
+  assisted: false,
 }
 </script>
 
@@ -20,7 +21,7 @@ const unranked = {
     <Story title="Direct Ask">
       <InboxScreen :item="vendorReview" />
     </Story>
-    <Story title="Unranked Mail">
+    <Story title="Without Suggestions">
       <InboxScreen :item="unranked" />
     </Story>
   </Stories>

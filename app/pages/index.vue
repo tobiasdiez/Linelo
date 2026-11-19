@@ -7,7 +7,7 @@ import actionFeedback from '~/data/action-feedback'
 type ToastAction = NonNullable<Parameters<ReturnType<typeof useToast>['add']>[0]['actions']>[number]
 
 const queue = useInboxQueue()
-const { current, status, resolving, resolve, undo } = queue
+const { current, status, stillFailing, resolving, resolve, undo } = queue
 const toast = useToast()
 const mainElement = useTemplateRef<HTMLElement>('mainElement')
 const retrying = ref(false)
@@ -15,11 +15,9 @@ const retrying = ref(false)
 // During server rendering, so the first thread is in the first paint
 await queue.load()
 
-// Then a longer list in the background, for everything after the first thread
+// Then a longer list and the sync in the background, as far as they are due; or, with nothing to show yet, the newest mail first
 onMounted(() => {
-  if (current.value) {
-    void queue.refill()
-  }
+  queue.resume()
 })
 
 // After every swap, focus the new heading so keyboard and screen reader users land on it
@@ -85,10 +83,8 @@ async function onRetry(): Promise<void> {
   } finally {
     retrying.value = false
   }
-  // As after the first paint: the longer list in the background
-  if (current.value) {
-    void queue.refill()
-  }
+  // As after the first paint
+  queue.resume()
 }
 </script>
 
@@ -108,9 +104,10 @@ async function onRetry(): Promise<void> {
         v-else-if="status === 'failed'"
         state="failed"
         :busy="retrying"
+        :still-failing="stillFailing"
         @retry="onRetry"
       />
-      <!-- Nothing while the inbox is not loaded, for example on the way to sign-in -->
+      <!-- Nothing while the inbox is not loaded (on the way to sign-in), nor in a check's first moments -->
       <InboxZero v-else-if="status === 'ready'" />
     </main>
   </div>

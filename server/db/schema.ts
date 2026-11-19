@@ -1,4 +1,16 @@
-import { boolean, index, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core'
+import {
+  boolean,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  primaryKey,
+  real,
+  text,
+  timestamp,
+  unique,
+  uuid,
+} from 'drizzle-orm/pg-core'
 
 /*
  * The database schema.
@@ -155,4 +167,75 @@ const calendarDecisions = pgTable(
   table => [unique().on(table.sourceId, table.sourceEventId), index().on(table.userId)],
 )
 
-export { users, sessions, accounts, verifications, calendarSources, calendarDecisions }
+/**
+ * One row per unread inbox message Linelo knows of (`server/ranking/index-store.ts`):
+ * ids, facts and numbers, no subject, text or readable address.
+ */
+const unreadMessages = pgTable(
+  'unread_messages',
+  {
+    accountId: uuid()
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    /** The provider's message id. */
+    messageId: text().notNull(),
+    /** The provider's conversation id; the queue shows conversations. */
+    threadId: text().notNull(),
+    receivedAt: timestamp({ withTimezone: true }).notNull(),
+    /** What the rules need. Null while only the id is known. */
+    facts: jsonb().$type<Ranking.Facts>(),
+    /** The judge's answers on the complete text. Null until judged. */
+    answers: jsonb().$type<Ranking.Answers>(),
+    /** The `Judge.id` that gave the answers; another id means "ask again". */
+    judge: text(),
+    /** When the judge was last asked without getting an answer; it is asked again ten minutes later at the earliest. */
+    triedAt: timestamp({ withTimezone: true }),
+    /** The score the queue is ordered by. Null while `facts` is null: such a row is not shown yet. */
+    score: real(),
+    /**
+     * Set when the user resolved the message in Linelo, cleared by Undo. The next listing
+     * removes the row, or clears this when the mailbox still lists the message as unread
+     * two minutes later: the mailbox stays the truth.
+     */
+    resolvedAt: timestamp({ withTimezone: true }),
+    ...timestamps(),
+  },
+  table => [primaryKey({ columns: [table.accountId, table.messageId] })],
+)
+
+/** What Linelo keeps per mailbox for ranking (`server/ranking/standing.ts`, `sync.ts`). */
+const mailboxProfiles = pgTable('mailbox_profiles', {
+  accountId: uuid()
+    .primaryKey()
+    .references(() => accounts.id, { onDelete: 'cascade' }),
+  /** Whom the account writes to: keyed hash of an address → how often, and when last. */
+  correspondents: jsonb().$type<Ranking.Correspondents>().notNull(),
+  /**
+   * The key's check and the version of the facts: another value means the stored sender keys
+   * were hashed with another key, or facts gained a signal; then Sent Items is rescanned and
+   * the facts are taken anew, without asking the judge again.
+   */
+  factsCheck: text().notNull(),
+  /** The version of the weights the stored scores were computed with; another one recomputes them. */
+  scoresVersion: integer().notNull().default(0),
+  /** When Sent Items was last scanned; rescanned after a day. */
+  sentScannedAt: timestamp({ withTimezone: true }),
+  /** When the unread mail was last listed in full. */
+  listedAt: timestamp({ withTimezone: true }),
+  /** When a sync last ended with nothing left to judge. */
+  syncedAt: timestamp({ withTimezone: true }),
+  /** A sync step runs until then; a second one answers that it is busy. */
+  syncingUntil: timestamp({ withTimezone: true }),
+  ...timestamps(),
+})
+
+export {
+  users,
+  sessions,
+  accounts,
+  verifications,
+  calendarSources,
+  calendarDecisions,
+  unreadMessages,
+  mailboxProfiles,
+}

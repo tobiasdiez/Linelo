@@ -1,10 +1,13 @@
 import { describe, expect, it, vi } from 'vite-plus/test'
 import MailError from '#server/mail/mail-error'
+import calendarTime from '#shared/utils/calendar-time'
 import conversations from './fixtures/graph-conversations.json'
 import createMicrosoftProvider from '#server/mail/providers/microsoft'
+import envelopes from './fixtures/graph-unread-envelopes.json'
 import httpStatus from '#shared/utils/http-status'
 import isRecord from '#shared/utils/is-record'
 import mailFakes from './mail-fakes'
+import sentItems from './fixtures/graph-sent-items.json'
 import unreadInbox from './fixtures/graph-unread-inbox.json'
 
 interface GraphCall {
@@ -26,6 +29,15 @@ type InnerAnswer = (request: InnerRequest) => { status: number; body?: unknown }
 
 const BATCH_LIMIT = 20
 const IMMUTABLE_IDS = /IdType="ImmutableId"/
+const TEXT_BODIES = 'outlook.body-content-type="text"'
+const VENDOR = 'AAQkAGI2-conversation-vendor'
+const NEWSLETTER = 'AAQkAGI2-conversation-newsletter'
+/** Answered with 503 inside the batch. */
+const STAGING = 'AAQkAGI2-conversation-staging'
+const ID_PREFIX = 'AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0A-'
+const LIST_PAGE = 1000
+const JUDGE_PAGE = 50
+const SENT_PAGE = 500
 
 function json(body: unknown, status: number = httpStatus.ok): Response {
   return Response.json(body, { status })
@@ -64,6 +76,14 @@ function fixtureAnswer(request: InnerRequest): { status: number; body?: unknown 
   return entries[key] ?? { status: httpStatus.notFound }
 }
 
+/** The fixture answer for a listing: Sent Items, a judge page (with texts), or the ids of unread mail. */
+function listAnswer(url: URL): unknown {
+  if (url.pathname.endsWith('/sentitems/messages')) {
+    return sentItems
+  }
+  return url.searchParams.get('$select')?.includes('uniqueBody') ? envelopes : unreadInbox
+}
+
 /**
  * Graph's answer to a send (`reply`, `forward`): `202 Accepted` without a body, or
  * for a failure its JSON error with the request id.
@@ -79,7 +99,8 @@ function sendAnswer(status: number = httpStatus.accepted, code = 'Forced'): Resp
 }
 
 interface FakeGraphOptions {
-  unread?: unknown
+  /** The answer to a listing (any GET outside a batch). */
+  list?: (url: URL) => unknown
   answer?: InnerAnswer
   /** Every answer, when set: a status Graph refuses with. */
   status?: () => number | undefined
@@ -88,11 +109,11 @@ interface FakeGraphOptions {
 }
 
 /**
- * A stand-in for Microsoft Graph: answers the unread listing, JSON batches and
- * sends (`202 Accepted` unless `answerSend` says otherwise), and records every call.
+ * A stand-in for Microsoft Graph: answers listings, JSON batches and sends
+ * (`202 Accepted` unless `answerSend` says otherwise), and records every call.
  */
 function fakeGraph({
-  unread = unreadInbox,
+  list = listAnswer,
   answer = fixtureAnswer,
   status,
   answerSend = () => sendAnswer(),
@@ -117,38 +138,372 @@ function fakeGraph({
       })
       return json({ responses: responses.toReversed() })
     }
-    return call.method === 'POST' ? answerSend() : json(unread)
+    return call.method === 'POST' ? answerSend() : json(list(url))
   })
   return { fetch, calls, warn }
 }
 
 const { connection } = mailFakes
+const MS_PER_MINUTE = calendarTime.MILLISECONDS_PER_MINUTE
+const MANY_UNREAD = 2500
+const MAX_LISTED = 20_000
+const CAPPED = 1500
+const SHORT_PAGE = 30
+const SHORT_IDS = 1000
+const ALL_SHORT_IDS = 70
+const TWO_PAGES = 120
+const LATEST = Date.parse('2026-10-12T10:00:00Z')
+
+/** `count` unread messages with ids and times only, one a minute, newest first. */
+function generated(count: number): Record<string, string>[] {
+  return Array.from({ length: count }, (_, index) => ({
+    id: `m${index}`,
+    conversationId: `c${index}`,
+    receivedDateTime: new Date(LATEST - index * MS_PER_MINUTE).toISOString(),
+  }))
+}
+
+/**
+ * A Graph inbox of these messages, newest first: it honours `receivedDateTime le …`, `$top`
+ * and `$skip`, answers at most `pageSize` entries at once (fewer than asked when it decides
+ * so), and names the next page while more remain.
+ */
+function pagedInbox(
+  messages: Record<string, string>[],
+  { pageSize = Number.POSITIVE_INFINITY } = {},
+) {
+  function answer(url: URL): unknown {
+    const before = /receivedDateTime le (?<time>\S+)/.exec(url.searchParams.get('$filter') ?? '')
+      ?.groups?.time
+    const top = Number(url.searchParams.get('$top'))
+    const skip = Number(url.searchParams.get('$skip') ?? 0)
+    const matching = messages.filter(
+      message =>
+        before === undefined || Date.parse(message.receivedDateTime ?? '') <= Date.parse(before),
+    )
+    const page = matching.slice(skip, skip + Math.min(top, pageSize))
+    const next = new URL(url)
+    next.searchParams.set('$skip', String(skip + page.length))
+    return skip + page.length < matching.length
+      ? { 'value': page, '@odata.nextLink': next.href }
+      : { value: page }
+  }
+  return {
+    answer,
+    /** The time of the message at `index`, as a filter names it. */
+    timeOf: (index: number) => new Date(LATEST - index * MS_PER_MINUTE).toISOString(),
+    /** The `$skip` of each call that reads `count` entries through next links. */
+    skipsUpTo: (count: number) =>
+      Array.from({ length: Math.ceil(count / pageSize) }, (_, page) =>
+        page === 0 ? undefined : String(page * pageSize),
+      ),
+  }
+}
 
 function batchCalls(calls: GraphCall[]): GraphCall[] {
   return calls.filter(call => call.url.pathname.endsWith('/$batch'))
 }
 
-describe('microsoft graph provider: unread threads', () => {
-  it('groups unread inbox messages into threads, newest unread first', async () => {
+/** The `$select` of a call, as a list. */
+function selected(call: GraphCall | undefined): string[] {
+  return call?.url.searchParams.get('$select')?.split(',') ?? []
+}
+
+describe('microsoft graph provider: listing unread mail', () => {
+  it('lists the ids of unread inbox messages, newest first, as many as asked for', async () => {
+    expect.hasAssertions()
+    const graph = fakeGraph()
+
+    const listed = await createMicrosoftProvider({ fetch: graph.fetch }).listUnreadIds(
+      connection(),
+      { limit: LIST_PAGE },
+    )
+
+    expect(listed[0]).toStrictEqual({
+      id: `${ID_PREFIX}lena-3`,
+      threadId: VENDOR,
+      receivedAt: '2026-10-12T09:43:00Z',
+    })
+    expect(listed).toHaveLength(unreadInbox.value.length)
+    const [call] = graph.calls
+    expect({
+      path: call?.url.pathname,
+      select: selected(call),
+      top: call?.url.searchParams.get('$top'),
+      orderBy: call?.url.searchParams.get('$orderby'),
+      filter: call?.url.searchParams.get('$filter'),
+      prefer: call?.headers.get('Prefer'),
+    }).toStrictEqual({
+      path: '/v1.0/me/mailFolders/inbox/messages',
+      select: ['id', 'conversationId', 'receivedDateTime'],
+      top: String(LIST_PAGE),
+      orderBy: 'receivedDateTime desc',
+      filter: expect.stringMatching(/^receivedDateTime ge .+ and isRead eq false$/),
+      prefer: expect.stringMatching(IMMUTABLE_IDS),
+    })
+  })
+
+  it('continues a judge page by time', async () => {
+    expect.hasAssertions()
+    const graph = fakeGraph()
+
+    await createMicrosoftProvider({ fetch: graph.fetch }).listUnread(connection(), {
+      limit: JUDGE_PAGE,
+      before: '2026-10-11T16:20:00Z',
+    })
+
+    expect(graph.calls[0]?.url.searchParams.get('$filter')).toBe(
+      'receivedDateTime le 2026-10-11T16:20:00.000Z and isRead eq false',
+    )
+  })
+
+  it('lists the ids of the newest unread mail 1,000 at a time, each request continuing by time', async () => {
+    expect.hasAssertions()
+    const inbox = pagedInbox(generated(MANY_UNREAD))
+    const graph = fakeGraph({ list: inbox.answer })
+
+    const listed = await createMicrosoftProvider({ fetch: graph.fetch }).listUnreadIds(
+      connection(),
+      { limit: MAX_LISTED },
+    )
+
+    expect({
+      count: listed.length,
+      unique: new Set(listed.map(entry => entry.id)).size,
+      first: listed[0]?.id,
+      last: listed.at(-1)?.id,
+      filters: graph.calls.map(call => call.url.searchParams.get('$filter')),
+      tops: graph.calls.map(call => call.url.searchParams.get('$top')),
+    }).toStrictEqual({
+      count: MANY_UNREAD,
+      unique: MANY_UNREAD,
+      first: 'm0',
+      last: `m${MANY_UNREAD - 1}`,
+      filters: [
+        expect.stringMatching(/^receivedDateTime ge .+ and isRead eq false$/),
+        `receivedDateTime le ${inbox.timeOf(LIST_PAGE - 1)} and isRead eq false`,
+        `receivedDateTime le ${inbox.timeOf(2 * LIST_PAGE - 2)} and isRead eq false`,
+      ],
+      tops: [String(LIST_PAGE), String(LIST_PAGE), String(LIST_PAGE)],
+    })
+  })
+
+  it('lists no more ids than asked for, so the oldest beyond the cap stay out', async () => {
+    expect.hasAssertions()
+    const graph = fakeGraph({ list: pagedInbox(generated(MANY_UNREAD)).answer })
+
+    const listed = await createMicrosoftProvider({ fetch: graph.fetch }).listUnreadIds(
+      connection(),
+      { limit: CAPPED },
+    )
+
+    expect([listed.length, listed.at(-1)?.id, graph.calls.length]).toStrictEqual([
+      CAPPED,
+      `m${CAPPED - 1}`,
+      2,
+    ])
+  })
+
+  it.each([
+    { what: 'ids', call: 'listUnreadIds', limit: SHORT_IDS },
+    { what: 'a judge page', call: 'listUnread', limit: JUDGE_PAGE },
+  ] as const)(
+    'completes $what that Graph answered short, by its next link',
+    async ({ call, limit }) => {
+      expect.hasAssertions()
+      const inbox = pagedInbox(generated(ALL_SHORT_IDS), { pageSize: SHORT_PAGE })
+      const graph = fakeGraph({ list: inbox.answer })
+      const expected = Math.min(limit, ALL_SHORT_IDS)
+
+      const listed = await createMicrosoftProvider({ fetch: graph.fetch })[call](connection(), {
+        limit,
+      })
+
+      expect({
+        count: listed.length,
+        // The pages after the first come from Graph's next links
+        skips: graph.calls.map(entry => entry.url.searchParams.get('$skip') ?? undefined),
+      }).toStrictEqual({ count: expected, skips: inbox.skipsUpTo(expected) })
+    },
+  )
+
+  it('makes up for entries that do not parse with the next page, and ends only where Graph does', async () => {
+    expect.hasAssertions()
+    const messages = generated(TWO_PAGES)
+    // Two messages Graph sends without a conversation
+    const broken = messages.map((message, index) =>
+      index < 2
+        ? { id: message.id ?? '', receivedDateTime: message.receivedDateTime ?? '' }
+        : message,
+    )
+    const graph = fakeGraph({ list: pagedInbox(broken).answer })
+
+    const page = await createMicrosoftProvider({ fetch: graph.fetch }).listUnread(connection(), {
+      limit: JUDGE_PAGE,
+    })
+
+    expect([page.length, page[0]?.id, graph.calls.length]).toStrictEqual([JUDGE_PAGE, 'm2', 2])
+  })
+
+  it('reads a judge page: envelopes, marks and the complete text of each message', async () => {
+    expect.hasAssertions()
+    const graph = fakeGraph()
+
+    const [vendor, newsletter, staging, ...rest] = await createMicrosoftProvider({
+      fetch: graph.fetch,
+    }).listUnread(connection(), { limit: JUDGE_PAGE, before: '2026-10-12T10:00:00Z' })
+
+    expect(vendor).toStrictEqual({
+      id: `${ID_PREFIX}lena-3`,
+      threadId: VENDOR,
+      from: { name: 'Lena Hartmann', email: 'lena.hartmann@northwind.co' },
+      to: [{ name: 'Mara Lindqvist', email: 'mara.lindqvist@northwind.co' }],
+      cc: [{ name: 'Priya Nair', email: 'priya.nair@northwind.co' }],
+      subject: 'RE: Vendor review: can we move sign-off to Thursday?',
+      receivedAt: '2026-10-12T09:43:00Z',
+      preview: 'Hi Mara, Does Thursday 14:00 work? Lena',
+      // The new part only, not the quoted history
+      text: 'Hi Mara,\n\nDoes Thursday 14:00 work?\n\nLena',
+      // No extended property: the header was asked for, so there is none
+      marks: {
+        unsubscribable: false,
+        importance: 'normal',
+        flagged: false,
+        sorting: 'focused',
+      },
+    })
+    expect(newsletter).toMatchObject({
+      // An empty unique body falls back to the whole body
+      text: 'This week: fewer meetings.\n\nRead the full issue online.',
+      marks: { unsubscribable: true, importance: 'low', flagged: false, sorting: 'other' },
+    })
+    expect(staging).toMatchObject({
+      text: "Staging is back up after this morning's database migration.",
+      marks: { unsubscribable: false, importance: 'high', flagged: true },
+    })
+    expect(staging?.marks.sorting).toBeUndefined()
+    // A message without a conversation is skipped
+    expect(rest).toStrictEqual([])
+  })
+
+  it('asks for the fields, the List-Unsubscribe header and text bodies of a judge page', async () => {
+    expect.hasAssertions()
+    const graph = fakeGraph()
+
+    await createMicrosoftProvider({ fetch: graph.fetch }).listUnread(connection(), {
+      limit: JUDGE_PAGE,
+    })
+
+    const [call] = graph.calls
+    expect(selected(call)).toStrictEqual([
+      'id',
+      'conversationId',
+      'receivedDateTime',
+      'subject',
+      'from',
+      'sender',
+      'toRecipients',
+      'ccRecipients',
+      'bodyPreview',
+      'importance',
+      'inferenceClassification',
+      'flag',
+      'uniqueBody',
+      'body',
+    ])
+    expect({
+      expand: call?.url.searchParams.get('$expand'),
+      top: call?.url.searchParams.get('$top'),
+      filter: call?.url.searchParams.get('$filter'),
+      prefer: call?.headers.get('Prefer'),
+    }).toStrictEqual({
+      expand: "singleValueExtendedProperties($filter=id eq 'String 0x1045')",
+      top: String(JUDGE_PAGE),
+      filter: expect.stringMatching(/and isRead eq false$/),
+      prefer: `IdType="ImmutableId", ${TEXT_BODIES}`,
+    })
+  })
+
+  it('reads whom the newest sent messages went to', async () => {
+    expect.hasAssertions()
+    const graph = fakeGraph()
+
+    const sent = await createMicrosoftProvider({ fetch: graph.fetch }).listSent(connection(), {
+      limit: SENT_PAGE,
+    })
+
+    expect(sent).toStrictEqual([
+      {
+        to: [{ name: 'Lena Hartmann', email: 'lena.hartmann@northwind.co' }],
+        cc: [{ name: 'Priya Nair', email: 'priya.nair@northwind.co' }],
+        sentAt: '2026-10-11T18:00:00Z',
+      },
+      {
+        to: [{ name: 'Jonas Weber', email: 'jonas.weber@northwind.co' }],
+        cc: [],
+        sentAt: '2026-10-09T12:00:00Z',
+      },
+    ])
+    const [call] = graph.calls
+    expect({
+      path: call?.url.pathname,
+      select: selected(call),
+      orderBy: call?.url.searchParams.get('$orderby'),
+      top: call?.url.searchParams.get('$top'),
+    }).toStrictEqual({
+      path: '/v1.0/me/mailFolders/sentitems/messages',
+      select: ['toRecipients', 'ccRecipients', 'sentDateTime'],
+      orderBy: 'sentDateTime desc',
+      top: String(SENT_PAGE),
+    })
+  })
+
+  it.each([
+    ['ids', 'listUnreadIds'],
+    ['a judge page', 'listUnread'],
+  ] as const)('does not take %s without a list of messages as an empty inbox', async (_, call) => {
+    expect.hasAssertions()
+    const graph = fakeGraph({ list: () => ({}) })
+
+    await expect(
+      createMicrosoftProvider({ fetch: graph.fetch })[call](connection(), { limit: 1 }),
+    ).rejects.toMatchObject({ kind: 'unavailable' })
+  })
+
+  it('does not take Sent Items without a list as nobody written to', async () => {
+    expect.hasAssertions()
+    const graph = fakeGraph({ list: () => ({ error: 'no list' }) })
+
+    await expect(
+      createMicrosoftProvider({ fetch: graph.fetch }).listSent(connection(), { limit: 1 }),
+    ).rejects.toMatchObject({ kind: 'unavailable' })
+  })
+})
+
+describe('microsoft graph provider: loading threads', () => {
+  it('loads the threads of the conversations in the order asked for', async () => {
     expect.hasAssertions()
     const graph = fakeGraph()
     const provider = createMicrosoftProvider({ fetch: graph.fetch })
 
-    const threads = await provider.listUnreadThreads(connection(), { limit: 4 })
+    const { threads, finished } = await provider.loadThreads(connection(), [NEWSLETTER, VENDOR])
 
     expect(threads.map(thread => thread.subject)).toStrictEqual([
-      'Vendor review: can we move sign-off to Thursday?',
       'Issue 212: The quiet case for fewer meetings',
+      'Vendor review: can we move sign-off to Thursday?',
     ])
     // The conversation id; the inbox makes it unique across accounts
-    expect(threads[0]?.id).toBe('AAQkAGI2-conversation-vendor')
+    expect(threads[1]?.id).toBe(VENDOR)
+    expect(finished).toStrictEqual([])
   })
 
   it('orders messages oldest to newest and drops drafts, Deleted Items and Junk', async () => {
     expect.hasAssertions()
     const provider = createMicrosoftProvider({ fetch: fakeGraph().fetch })
 
-    const [vendor] = await provider.listUnreadThreads(connection(), { limit: 1 })
+    const {
+      threads: [vendor],
+    } = await provider.loadThreads(connection(), [VENDOR])
 
     expect(vendor?.messages.map(message => [message.from.name, message.unread])).toStrictEqual([
       ['Lena Hartmann', true],
@@ -161,7 +516,9 @@ describe('microsoft graph provider: unread threads', () => {
     expect.hasAssertions()
     const provider = createMicrosoftProvider({ fetch: fakeGraph().fetch })
 
-    const [vendor, newsletter] = await provider.listUnreadThreads(connection(), { limit: 2 })
+    const {
+      threads: [vendor, newsletter],
+    } = await provider.loadThreads(connection(), [VENDOR, NEWSLETTER])
 
     expect(vendor?.messages.at(-1)).toMatchObject({
       body: 'Hi Mara,\n\nDoes Thursday 14:00 work?\n\nLena',
@@ -177,36 +534,61 @@ describe('microsoft graph provider: unread threads', () => {
   it('asks for immutable ids and text bodies on every request', async () => {
     expect.hasAssertions()
     const graph = fakeGraph()
-    await createMicrosoftProvider({ fetch: graph.fetch }).listUnreadThreads(connection(), {
-      limit: 4,
-    })
+    await createMicrosoftProvider({ fetch: graph.fetch }).loadThreads(connection(), [
+      VENDOR,
+      NEWSLETTER,
+    ])
 
-    const [listing] = graph.calls
     const inner = batchCalls(graph.calls).flatMap(call => innerRequests(call.body))
 
-    expect(listing?.headers.get('Prefer')).toMatch(IMMUTABLE_IDS)
-    expect(listing?.url.searchParams.get('$orderby')).toBe('receivedDateTime desc')
-    expect(listing?.url.searchParams.get('$filter')).toMatch(
-      /^receivedDateTime ge .+ and isRead eq false$/,
-    )
     expect(inner.map(request => IMMUTABLE_IDS.test(request.headers.Prefer ?? ''))).not.toContain(
       false,
     )
     expect(
       inner
         .filter(request => request.id.startsWith('conversation'))
-        .map(request => request.headers.Prefer?.includes('outlook.body-content-type="text"')),
-    ).not.toContain(false)
+        .map(request => request.headers.Prefer?.includes(TEXT_BODIES)),
+    ).toStrictEqual([true, true])
   })
 
-  it('skips a conversation whose part of the batch failed', async () => {
+  it('reports a conversation with nothing unread left as finished', async () => {
+    expect.hasAssertions()
+    const graph = fakeGraph({
+      answer: request => {
+        const fixture = fixtureAnswer(request)
+        if (!request.id.startsWith('conversation') || !isRecord(fixture.body)) {
+          return fixture
+        }
+        const read: unknown[] = structuredClone(
+          Array.isArray(fixture.body.value) ? fixture.body.value : [],
+        )
+        for (const message of read) {
+          if (isRecord(message)) {
+            message.isRead = true
+          }
+        }
+        return { status: httpStatus.ok, body: { value: read } }
+      },
+    })
+
+    await expect(
+      createMicrosoftProvider({ fetch: graph.fetch }).loadThreads(connection(), [VENDOR]),
+    ).resolves.toStrictEqual({ threads: [], finished: [VENDOR] })
+  })
+
+  it('skips a conversation whose part of the batch failed, as neither loaded nor finished', async () => {
     expect.hasAssertions()
     const graph = fakeGraph()
     const provider = createMicrosoftProvider({ fetch: graph.fetch })
 
-    const threads = await provider.listUnreadThreads(connection(), { limit: 3 })
+    const { threads, finished } = await provider.loadThreads(connection(), [
+      VENDOR,
+      NEWSLETTER,
+      STAGING,
+    ])
 
     expect(threads).toHaveLength(2)
+    expect(finished).toStrictEqual([])
     expect(graph.warn).toHaveBeenCalledExactlyOnceWith(
       'Loading a conversation from Microsoft Graph failed',
       httpStatus.serviceUnavailable,
@@ -223,30 +605,26 @@ describe('microsoft graph provider: unread threads', () => {
     })
 
     await expect(
-      createMicrosoftProvider({ fetch: graph.fetch }).listUnreadThreads(connection(), { limit: 2 }),
+      createMicrosoftProvider({ fetch: graph.fetch }).loadThreads(connection(), [
+        VENDOR,
+        NEWSLETTER,
+      ]),
     ).rejects.toMatchObject({ kind: 'unavailable' })
   })
 
   it('splits conversations into batches of 20', async () => {
     expect.hasAssertions()
-    const unread = {
-      value: Array.from({ length: 25 }, (_, index) => ({
-        id: `message-${index}`,
-        conversationId: `conversation-${index}`,
-        receivedDateTime: '2026-10-12T09:00:00Z',
-      })),
-    }
+    const ids = Array.from({ length: 20 }, (_, index) => `conversation-${index}`)
     const graph = fakeGraph({
-      unread,
       answer: request =>
         request.id.startsWith('folder')
           ? fixtureAnswer(request)
           : { status: httpStatus.ok, body: { value: [] } },
     })
 
-    const threads = await createMicrosoftProvider({ fetch: graph.fetch }).listUnreadThreads(
+    const loaded = await createMicrosoftProvider({ fetch: graph.fetch }).loadThreads(
       connection(),
-      { limit: 20 },
+      ids,
     )
 
     // Two folders and 20 conversations
@@ -254,17 +632,17 @@ describe('microsoft graph provider: unread threads', () => {
       BATCH_LIMIT,
       2,
     ])
-    expect(threads).toStrictEqual([])
+    expect(loaded).toStrictEqual({ threads: [], finished: ids })
   })
 
-  it('asks for no threads when nothing is unread', async () => {
+  it('asks Graph nothing for no conversations', async () => {
     expect.hasAssertions()
-    const graph = fakeGraph({ unread: { value: [] } })
+    const graph = fakeGraph()
 
     await expect(
-      createMicrosoftProvider({ fetch: graph.fetch }).listUnreadThreads(connection(), { limit: 4 }),
-    ).resolves.toStrictEqual([])
-    expect(batchCalls(graph.calls)).toHaveLength(0)
+      createMicrosoftProvider({ fetch: graph.fetch }).loadThreads(connection(), []),
+    ).resolves.toStrictEqual({ threads: [], finished: [] })
+    expect(graph.calls).toHaveLength(0)
   })
 
   it('looks up the hidden folders once per account', async () => {
@@ -272,8 +650,8 @@ describe('microsoft graph provider: unread threads', () => {
     const graph = fakeGraph()
     const provider = createMicrosoftProvider({ fetch: graph.fetch })
 
-    await provider.listUnreadThreads(connection(), { limit: 2 })
-    await provider.listUnreadThreads(connection(), { limit: 2 })
+    await provider.loadThreads(connection(), [VENDOR])
+    await provider.loadThreads(connection(), [VENDOR])
 
     const folderLookups = batchCalls(graph.calls).map(
       call => innerRequests(call.body).filter(request => request.id.startsWith('folder')).length,
@@ -291,10 +669,10 @@ describe('microsoft graph provider: unread threads', () => {
     })
     const provider = createMicrosoftProvider({ fetch: graph.fetch })
 
-    await expect(provider.listUnreadThreads(connection(), { limit: 2 })).rejects.toMatchObject({
+    await expect(provider.loadThreads(connection(), [VENDOR])).rejects.toMatchObject({
       kind: 'unavailable',
     })
-    await expect(provider.listUnreadThreads(connection(), { limit: 2 })).rejects.toMatchObject({
+    await expect(provider.loadThreads(connection(), [VENDOR])).rejects.toMatchObject({
       kind: 'unavailable',
     })
     expect(batchCalls(graph.calls)).toHaveLength(2)
@@ -304,9 +682,12 @@ describe('microsoft graph provider: unread threads', () => {
     expect.hasAssertions()
     const graph = fakeGraph()
 
-    const [vendor, newsletter] = await createMicrosoftProvider({
-      fetch: graph.fetch,
-    }).listUnreadThreads(connection(), { limit: 2 })
+    const {
+      threads: [vendor, newsletter],
+    } = await createMicrosoftProvider({ fetch: graph.fetch }).loadThreads(connection(), [
+      VENDOR,
+      NEWSLETTER,
+    ])
 
     const conversation = batchCalls(graph.calls)
       .flatMap(call => innerRequests(call.body))
@@ -344,10 +725,9 @@ describe('microsoft graph provider: unread threads', () => {
       },
     })
 
-    const [vendor] = await createMicrosoftProvider({ fetch: graph.fetch }).listUnreadThreads(
-      connection(),
-      { limit: 1 },
-    )
+    const {
+      threads: [vendor],
+    } = await createMicrosoftProvider({ fetch: graph.fetch }).loadThreads(connection(), [VENDOR])
 
     expect(vendor?.messages[0].body).toBe('Hi Mara,\n\nThursday works & Friday too.\nLena')
   })
@@ -360,14 +740,11 @@ describe('microsoft graph provider: errors', () => {
     const graph = fakeGraph({ status: () => statuses.shift() })
     const mailbox = connection()
 
-    const threads = await createMicrosoftProvider({ fetch: graph.fetch }).listUnreadThreads(
-      mailbox,
-      {
-        limit: 4,
-      },
-    )
+    const listed = await createMicrosoftProvider({ fetch: graph.fetch }).listUnreadIds(mailbox, {
+      limit: LIST_PAGE,
+    })
 
-    expect(threads).toHaveLength(2)
+    expect(listed).toHaveLength(unreadInbox.value.length)
     expect(mailbox.accessToken).toHaveBeenLastCalledWith({ force: true })
     expect(graph.calls.at(-1)?.headers.get('Authorization')).toBe('Bearer refreshed-token')
   })
@@ -378,7 +755,7 @@ describe('microsoft graph provider: errors', () => {
     const mailbox = connection()
 
     await expect(
-      createMicrosoftProvider({ fetch: graph.fetch }).listUnreadThreads(mailbox, { limit: 4 }),
+      createMicrosoftProvider({ fetch: graph.fetch }).listUnread(mailbox, { limit: JUDGE_PAGE }),
     ).rejects.toMatchObject({ kind: 'reconnect' })
     expect(mailbox.accessToken).toHaveBeenCalledTimes(2)
   })
@@ -388,7 +765,7 @@ describe('microsoft graph provider: errors', () => {
     const graph = fakeGraph({ answer: () => ({ status: httpStatus.unauthorized }) })
 
     await expect(
-      createMicrosoftProvider({ fetch: graph.fetch }).listUnreadThreads(connection(), { limit: 4 }),
+      createMicrosoftProvider({ fetch: graph.fetch }).loadThreads(connection(), [VENDOR]),
     ).rejects.toMatchObject({ kind: 'reconnect' })
   })
 
@@ -399,8 +776,8 @@ describe('microsoft graph provider: errors', () => {
       const graph = fakeGraph({ status: () => status })
 
       await expect(
-        createMicrosoftProvider({ fetch: graph.fetch }).listUnreadThreads(connection(), {
-          limit: 4,
+        createMicrosoftProvider({ fetch: graph.fetch }).listSent(connection(), {
+          limit: SENT_PAGE,
         }),
       ).rejects.toMatchObject({ kind: 'unavailable' })
     },
@@ -410,7 +787,7 @@ describe('microsoft graph provider: errors', () => {
     expect.hasAssertions()
     const fetch = vi.fn<typeof globalThis.fetch>().mockRejectedValue(new TypeError('fetch failed'))
 
-    const failure = createMicrosoftProvider({ fetch }).listUnreadThreads(connection(), { limit: 4 })
+    const failure = createMicrosoftProvider({ fetch }).listUnreadIds(connection(), { limit: 4 })
 
     await expect(failure).rejects.toBeInstanceOf(MailError)
     await expect(failure).rejects.toMatchObject({ kind: 'unavailable' })
@@ -423,7 +800,7 @@ describe('microsoft graph provider: errors', () => {
     mailbox.accessToken.mockRejectedValue(new MailError('reconnect', 'grant revoked'))
 
     await expect(
-      createMicrosoftProvider({ fetch: graph.fetch }).listUnreadThreads(mailbox, { limit: 4 }),
+      createMicrosoftProvider({ fetch: graph.fetch }).loadThreads(mailbox, [VENDOR]),
     ).rejects.toMatchObject({ kind: 'reconnect' })
     expect(graph.fetch).not.toHaveBeenCalled()
   })
@@ -440,7 +817,7 @@ describe('microsoft graph provider: errors', () => {
     )
 
     await expect(
-      createMicrosoftProvider({ fetch, timeoutMs: 5 }).listUnreadThreads(connection(), {
+      createMicrosoftProvider({ fetch, timeoutMs: 5 }).listUnread(connection(), {
         limit: 1,
       }),
     ).rejects.toMatchObject({ kind: 'unavailable' })
@@ -461,7 +838,7 @@ describe('microsoft graph provider: errors', () => {
     )
 
     await expect(
-      createMicrosoftProvider({ fetch: empty }).listUnreadThreads(connection(), { limit: 1 }),
+      createMicrosoftProvider({ fetch: empty }).listUnreadIds(connection(), { limit: 1 }),
     ).rejects.toMatchObject({ kind: 'unavailable' })
   })
 
@@ -484,26 +861,16 @@ describe('microsoft graph provider: errors', () => {
     const garbled = vi.fn<typeof globalThis.fetch>(async () => new Response('<html>'))
 
     await expect(
-      createMicrosoftProvider({ fetch: stalled, timeoutMs: 5 }).listUnreadThreads(connection(), {
+      createMicrosoftProvider({ fetch: stalled, timeoutMs: 5 }).listUnreadIds(connection(), {
         limit: 1,
       }),
     ).rejects.toMatchObject({ kind: 'unavailable' })
     await expect(
-      createMicrosoftProvider({ fetch: garbled }).listUnreadThreads(connection(), { limit: 1 }),
+      createMicrosoftProvider({ fetch: garbled }).listUnreadIds(connection(), { limit: 1 }),
     ).rejects.toMatchObject({
       kind: 'unavailable',
       message: 'Microsoft Graph answered 200 without JSON',
     })
-  })
-
-  it('does not take a listing without a list of messages as an empty inbox', async () => {
-    expect.hasAssertions()
-    const graph = fakeGraph({ unread: {} })
-
-    await expect(
-      createMicrosoftProvider({ fetch: graph.fetch }).listUnreadThreads(connection(), { limit: 1 }),
-    ).rejects.toMatchObject({ kind: 'unavailable' })
-    expect(batchCalls(graph.calls)).toHaveLength(0)
   })
 
   it('logs what Graph said when it refused a read', async () => {
@@ -511,7 +878,7 @@ describe('microsoft graph provider: errors', () => {
     const graph = fakeGraph({ status: () => httpStatus.tooManyRequests })
 
     await expect(
-      createMicrosoftProvider({ fetch: graph.fetch }).listUnreadThreads(connection(), { limit: 1 }),
+      createMicrosoftProvider({ fetch: graph.fetch }).listUnreadIds(connection(), { limit: 1 }),
     ).rejects.toMatchObject({
       kind: 'unavailable',
       message: 'Microsoft Graph answered 429 Forced (request-id unknown)',

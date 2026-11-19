@@ -36,10 +36,10 @@ async function visit(
   if (signedIn) {
     useCurrentUser().set(signedInUser)
   }
-  useInboxQueue().reset([inboxItem])
   const api = fakeInbox.api([inboxItem])
   api.me.answer =
     me ?? (() => (session ? { ...session, accounts: [account] } : fakeInbox.signedOutMe()))
+  useInboxQueue().reset([inboxItem])
   const screen = await renderApp(route)
   try {
     await run(api, consoleError)
@@ -65,6 +65,20 @@ describe('sign-in', () => {
 
       // Signed out is an answer, not a failure
       expect(consoleError).not.toHaveBeenCalled()
+    })
+  })
+
+  it('says what is sent to Jev to put the mail in order', async () => {
+    expect.hasAssertions()
+
+    await visit('/sign-in', { signedIn: false }, async () => {
+      await expect
+        .element(
+          page.getByText(
+            "To put your mail in order, Linelo sends the sender's name, the subject and the text of unread messages to Jev, a model run by TypeSafe AI in the United States. TypeSafe does not train on it.",
+          ),
+        )
+        .toBeVisible()
     })
   })
 

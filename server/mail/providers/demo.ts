@@ -1,5 +1,6 @@
 import MailError from '../mail-error'
 import createInboxFixtures from '#shared/data/inbox-fixtures'
+import participants from '#shared/utils/participants'
 
 /*
  * Development only: the example threads behind the same interface as a real
@@ -16,6 +17,45 @@ interface DemoMailbox {
 interface Dependencies {
   /** The time the example threads are relative to. */
   now?: () => Date
+}
+
+/** Graph's length of a preview. */
+const PREVIEW_LENGTH = 255
+
+/** How Outlook would mark the example messages: personal mail sorted under Focused, the newsletter a list. */
+const DEFAULT_MARKS: Mail.Marks = {
+  unsubscribable: false,
+  importance: 'normal',
+  flagged: false,
+  sorting: 'focused',
+}
+const DEMO_MARKS: Readonly<Record<string, Partial<Mail.Marks>>> = {
+  'newsletter-1': { unsubscribable: true, sorting: 'other' },
+}
+
+/** An unread message and the thread it belongs to. */
+interface UnreadMessage {
+  message: Inbox.Message
+  thread: Mail.Thread
+}
+
+function newestFirst(first: { sentAt: string }, second: { sentAt: string }): number {
+  return Date.parse(second.sentAt) - Date.parse(first.sentAt)
+}
+
+function toEnvelope({ message, thread }: UnreadMessage): Mail.Envelope {
+  return {
+    id: message.id,
+    threadId: thread.id,
+    from: message.from,
+    to: message.to,
+    cc: message.cc,
+    subject: thread.subject,
+    receivedAt: message.sentAt,
+    preview: message.body.slice(0, PREVIEW_LENGTH),
+    text: message.body,
+    marks: { ...DEFAULT_MARKS, ...DEMO_MARKS[message.id] },
+  }
 }
 
 function createDemoProvider({ now = () => new Date() }: Dependencies = {}): Mail.Provider {
@@ -47,6 +87,50 @@ function createDemoProvider({ now = () => new Date() }: Dependencies = {}): Mail
     }
     const [first, ...rest] = thread.messages
     return { ...thread, messages: [current(first), ...rest.map(message => current(message))] }
+  }
+
+  function currentThreads(accountId: string): Mail.Thread[] {
+    const demo = mailbox(accountId)
+    return demo.threads.map(thread => withReadState(thread, demo))
+  }
+
+  /** The unread messages of the mailbox, newest first, received at or before `before` when given. */
+  function unreadMessages(accountId: string, { limit, before }: Mail.Listing): UnreadMessage[] {
+    const until = before === undefined ? Number.POSITIVE_INFINITY : Date.parse(before)
+    return currentThreads(accountId)
+      .flatMap(thread =>
+        thread.messages
+          .filter(message => message.unread && Date.parse(message.sentAt) <= until)
+          .map(message => ({ message, thread })),
+      )
+      .toSorted((first, second) => newestFirst(first.message, second.message))
+      .slice(0, limit)
+  }
+
+  function loadThreads(connection: Mail.Connection, threadIds: readonly string[]) {
+    const byId = new Map(currentThreads(connection.account.id).map(thread => [thread.id, thread]))
+    const loaded: Mail.LoadedThreads = { threads: [], finished: [] }
+    for (const id of threadIds) {
+      const thread = byId.get(id)
+      if (thread?.messages.some(message => message.unread)) {
+        loaded.threads.push(thread)
+      } else {
+        loaded.finished.push(id)
+      }
+    }
+    return Promise.resolve(loaded)
+  }
+
+  /** The owner's own messages in the example threads, as Sent Items would hold them. */
+  function listSent(connection: Mail.Connection, { limit }: { limit: number }) {
+    const owner = connection.account.address
+    const sent = currentThreads(connection.account.id)
+      .flatMap(thread => thread.messages)
+      .filter(message => participants.isSameAddress(message.from, owner))
+      .toSorted(newestFirst)
+      .slice(0, limit)
+      .map(({ to, cc, sentAt }) => ({ to, cc, sentAt }))
+    return Promise.resolve(sent)
   }
 
   /** Adds the mailbox owner's sent message to the thread of the message it answers, as Sent Items would. */
@@ -81,13 +165,22 @@ function createDemoProvider({ now = () => new Date() }: Dependencies = {}): Mail
   return {
     // The demo account needs no scopes
     mailScopes: [],
-    listUnreadThreads(connection, { limit }) {
-      const demo = mailbox(connection.account.id)
-      const threads = demo.threads
-        .map(thread => withReadState(thread, demo))
-        .filter(thread => thread.messages.some(message => message.unread))
-      return Promise.resolve(threads.slice(0, limit))
+    listUnreadIds(connection, listing) {
+      return Promise.resolve(
+        unreadMessages(connection.account.id, listing).map(({ message, thread }) => ({
+          id: message.id,
+          threadId: thread.id,
+          receivedAt: message.sentAt,
+        })),
+      )
     },
+    listUnread(connection, listing) {
+      return Promise.resolve(
+        unreadMessages(connection.account.id, listing).map(entry => toEnvelope(entry)),
+      )
+    },
+    loadThreads,
+    listSent,
     setRead(connection, messageIds, read) {
       const demo = mailbox(connection.account.id)
       for (const id of messageIds) {

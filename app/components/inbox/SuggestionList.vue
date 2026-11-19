@@ -9,10 +9,13 @@ interface Focusable {
 
 const {
   suggestions,
+  assisted = false,
   busy = false,
   pending = undefined,
 } = defineProps<{
   suggestions: Inbox.Suggestion[]
+  /** A model contributed (`QueueItem.assisted`): the heading carries the AI badge. */
+  assisted?: boolean
   /** Blocks the suggestions, and their number keys, while an action is being carried out. */
   busy?: boolean
   /** The id of the suggestion being carried out, shown with a spinner. */
@@ -71,7 +74,7 @@ defineExpose({ focusSuggestion })
 
 <template>
   <section :aria-labelledby="headingId">
-    <RailHeading :heading-id="headingId" ai>Suggested</RailHeading>
+    <RailHeading :heading-id="headingId" :ai="assisted">Suggested</RailHeading>
     <ul class="space-y-2">
       <li v-for="(suggestion, index) in suggestions" :key="suggestion.id">
         <SuggestionCard

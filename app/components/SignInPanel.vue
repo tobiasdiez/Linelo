@@ -85,6 +85,11 @@ const alert = computed(() => (notice && notice !== 'cancelled' ? alerts[notice] 
         reading, writing and sending mail, and reading and writing your calendar; Linelo only uses
         that access for the actions you take.
       </p>
+      <p class="text-toned">
+        To put your mail in order, Linelo sends the sender's name, the subject and the text of
+        unread messages to Jev, a model run by TypeSafe AI in the United States. TypeSafe does not
+        train on it.
+      </p>
     </div>
 
     <div>

@@ -52,6 +52,10 @@ async function withRail(
   }
 }
 
+function suggested(): ReturnType<typeof page.getByRole> {
+  return page.getByRole('region', { name: 'Suggested' })
+}
+
 function holdKey(key: string): void {
   globalThis.dispatchEvent(new KeyboardEvent('keydown', { key }))
   globalThis.dispatchEvent(new KeyboardEvent('keydown', { key, repeat: true }))
@@ -59,6 +63,23 @@ function holdKey(key: string): void {
 }
 
 describe('decision rail', () => {
+  it('marks the suggestions as AI only where a model contributed', async () => {
+    expect.hasAssertions()
+    // The handled suggestion from a List-Unsubscribe header alone
+    const byRules = { ...storyItem('thread-newsletter'), assisted: false }
+
+    await withRail(async () => {
+      await expect.element(suggested().getByText('AI', { exact: true })).toBeVisible()
+    })
+    await withRail(
+      async () => {
+        await expect.element(suggested().getByText('Nothing to act on')).toBeVisible()
+        await expect.element(suggested().getByText('AI', { exact: true })).not.toBeInTheDocument()
+      },
+      { item: byRules },
+    )
+  })
+
   it('opens a pre-filled composer for suggestion 1, ready to send', async () => {
     expect.hasAssertions()
 

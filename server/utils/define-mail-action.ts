@@ -3,15 +3,16 @@ import mail from './mail'
 import requireUser from './require-user'
 
 /**
- * A mail action route (`POST /api/mail/*`): a JSON body of a known size from
- * Linelo's own pages (403, 411, 413 or 415 otherwise), the signed-in user (401),
- * a body that is JSON and passes `validate` (400 with the failing field), then
- * `run` with the user's mailboxes. A failed mail call becomes its HTTP answer
- * (`mail.toHttpError`, 404 for an account that is not the user's); success is 204.
+ * A mail action route (`POST /api/mail/*`, `POST /api/inbox/sync`): a JSON body of a
+ * known size from Linelo's own pages (403, 411, 413 or 415 otherwise), the signed-in
+ * user (401), a body that is JSON and passes `validate` (400 with the failing field),
+ * then `run` with the user's mailboxes. A failed mail call becomes its HTTP answer
+ * (`mail.toHttpError`, 404 for an account that is not the user's); success is what
+ * `run` resolves to, or 204 when that is nothing.
  */
-function defineMailAction<Request>(
+function defineMailAction<Request, Answer>(
   validate: (body: unknown) => Inbox.Validated<Request>,
-  run: (mailboxes: readonly Mail.Mailbox[], request: Request) => Promise<void>,
+  run: (mailboxes: readonly Mail.Mailbox[], request: Request) => Promise<Answer>,
 ) {
   return defineEventHandler(async event => {
     const refused = actionRequest.refusal(event.headers)
@@ -28,11 +29,11 @@ function defineMailAction<Request>(
       throw createError({ statusCode: 400, statusMessage: 'Invalid request', data: { field } })
     }
     try {
-      await run(await mail.mailboxesOf(user.id), request)
+      const answer = await run(await mail.mailboxesOf(user.id), request)
+      return answer === undefined ? sendNoContent(event) : answer
     } catch (error) {
       throw mail.toHttpError(error)
     }
-    return sendNoContent(event)
   })
 }
 

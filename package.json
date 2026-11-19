@@ -18,6 +18,7 @@
     "db:studio:production": "DOTENV_CONFIG_PATH=.env.production drizzle-kit studio",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
+    "ranking:demo-answers": "vp test --config test/unit/refresh.config.ts && vp test test/unit/ranking-golden.spec.ts --project unit --update && vp fmt server/ranking/judges/demo-answers.json test/unit/ranking-golden.spec.ts",
     "postinstall": "nuxt prepare",
     "storybook": "storybook dev -p 6006",
     "storybook:build": "storybook build"
@@ -27,6 +28,7 @@
     "@neon/config": "1.10.0",
     "@neon/env": "1.6.8",
     "@nuxt/ui": "4.12.0",
+    "@typesafe-ai/sdk": "0.7.0",
     "@vitest/coverage-v8": "catalog:",
     "better-auth": "1.7.14",
     "drizzle-orm": "0.45.4",

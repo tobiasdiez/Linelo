@@ -13,5 +13,8 @@ import InboxStatus from './InboxStatus.vue'
     <Story title="Trying Again">
       <InboxStatus state="failed" busy />
     </Story>
+    <Story title="Still Failing">
+      <InboxStatus state="failed" still-failing />
+    </Story>
   </Stories>
 </template>

@@ -20,10 +20,12 @@ const TEXT_BODIES = 'outlook.body-content-type="text"'
 const JSON_BY_IMMUTABLE_ID = { 'Content-Type': 'application/json', 'Prefer': IMMUTABLE_IDS }
 /** Graph's error code for a token without the permission the call needs (here: `Mail.Send`). */
 const ACCESS_DENIED = 'ErrorAccessDenied'
-/** How many of the newest unread inbox messages are looked at to find conversations. */
-const UNREAD_SCAN_SIZE = 50
 /** How many of a conversation's newest messages come with it. */
 const CONVERSATION_SIZE = 25
+/** Ids per request of the id listing, Graph's largest page of messages. */
+const ID_PAGE = 1000
+/** Next links followed at most to complete one page that Graph answered short. */
+const MAX_PAGES = 10
 /** Graph requires `$orderby` properties to appear first in `$filter`; this one matches every message. */
 const ANY_TIME = 'receivedDateTime ge 1900-01-01T00:00:00Z'
 const MESSAGE_FIELDS: readonly (keyof Message)[] = [
@@ -43,7 +45,23 @@ const MESSAGE_FIELDS: readonly (keyof Message)[] = [
   'uniqueBody',
   'body',
 ]
-const SCAN_FIELDS: readonly (keyof Message)[] = ['id', 'conversationId', 'receivedDateTime']
+const LISTED_FIELDS: readonly (keyof Message)[] = ['id', 'conversationId', 'receivedDateTime']
+/** What the ranking reads about a message: its envelope, marks and own text. */
+const ENVELOPE_FIELDS: readonly (keyof Message)[] = [
+  ...LISTED_FIELDS,
+  'subject',
+  'from',
+  'sender',
+  'toRecipients',
+  'ccRecipients',
+  'bodyPreview',
+  'importance',
+  'inferenceClassification',
+  'flag',
+  'uniqueBody',
+  'body',
+]
+const SENT_FIELDS: readonly (keyof Message)[] = ['toRecipients', 'ccRecipients', 'sentDateTime']
 const ATTACHMENT_FIELDS: readonly (keyof Attachment)[] = ['id', 'name', 'size', 'isInline']
 /** Well-known folders whose messages are not shown in a thread. */
 const HIDDEN_FOLDERS = ['deleteditems', 'junkemail']
@@ -65,13 +83,41 @@ interface Conversations {
 
 const { query, said, assertAuthorized, assertSucceeded } = graphClient
 
-function unreadInboxUrl(): string {
+/**
+ * Unread inbox messages, newest first, received at or before `before` when given. The time
+ * filter comes first, as Graph requires for `$orderby`, and continues a listing.
+ */
+function unreadInboxUrl(
+  { limit, before }: Mail.Listing,
+  fields: readonly (keyof Message)[],
+  extra: Record<string, string> = {},
+): string {
+  const time = before ? `receivedDateTime le ${new Date(before).toISOString()}` : ANY_TIME
   return `/me/mailFolders/inbox/messages?${query({
-    $filter: `${ANY_TIME} and isRead eq false`,
+    $filter: `${time} and isRead eq false`,
     $orderby: 'receivedDateTime desc',
-    $select: SCAN_FIELDS.join(','),
-    $top: String(UNREAD_SCAN_SIZE),
+    $select: fields.join(','),
+    ...extra,
+    $top: String(limit),
   })}`
+}
+
+/** The List-Unsubscribe header, as the one extended property expanded on each message. */
+const LIST_UNSUBSCRIBE_EXPAND = `singleValueExtendedProperties($filter=id eq '${microsoftMessages.listUnsubscribe}')`
+
+/** The `value` list of a collection; never an empty list for an answer that is not one. */
+function assertList(body: unknown, what: string): unknown {
+  if (!isRecord(body) || !Array.isArray(body.value)) {
+    throw new MailError('unavailable', `Microsoft Graph listed ${what} without a \`value\` list`)
+  }
+  return body
+}
+
+/** How to read a collection: what to call it in errors, the headers, and how to parse a page. */
+interface Collection<Entry> {
+  what: string
+  headers?: Record<string, string>
+  parse: (body: unknown) => Entry[]
 }
 
 function conversationRequest(conversationId: string, index: number): Graph.BatchRequest {
@@ -119,31 +165,39 @@ function folderId(responses: ReadonlyMap<string, Graph.BatchResponse>, folder: s
   return body.id
 }
 
-/** The threads of the conversations, in their order. A conversation that failed to load is skipped. */
+/**
+ * The threads of the conversations, in their order, and the conversations with nothing
+ * unread left. A conversation that failed to load is in neither and logged.
+ */
 function toThreads(
   { conversationIds, hiddenFolderIds }: Conversations,
   responses: ReadonlyMap<string, Graph.BatchResponse>,
-): Mail.Thread[] {
+): Mail.LoadedThreads {
+  const loaded: Mail.LoadedThreads = { threads: [], finished: [] }
   let failures = 0
-  const threads = conversationIds.flatMap((_, index) => {
+  for (const [index, conversationId] of conversationIds.entries()) {
     const response = responses.get(`conversation-${index}`)
     assertAuthorized(response)
     if (!response || !httpStatus.isSuccess(response.status)) {
       failures += 1
       console.warn('Loading a conversation from Microsoft Graph failed', response?.status)
-      return []
+      continue
     }
     const thread = microsoftMessages.toThread(
       microsoftMessages.parseList(response.body),
       hiddenFolderIds,
     )
-    return thread ? [thread] : []
-  })
+    if (thread) {
+      loaded.threads.push(thread)
+    } else {
+      loaded.finished.push(conversationId)
+    }
+  }
   // Never report an empty inbox when it just did not load
   if (failures > 0 && failures === conversationIds.length) {
     throw new MailError('unavailable', 'No conversation could be loaded from Microsoft Graph')
   }
-  return threads
+  return loaded
 }
 
 /**
@@ -172,6 +226,10 @@ function sendRefused(status: number, refusal: Graph.Refusal): Error {
   )
 }
 
+function callerOf(connection: Mail.Connection, token: string): Graph.Caller {
+  return { accountId: connection.account.id, token }
+}
+
 /** Participants as Graph's recipients. */
 function recipients(list: readonly Inbox.Participant[]): Recipient[] {
   return list.map(({ name, email }) => ({ emailAddress: { name, address: email } }))
@@ -184,28 +242,109 @@ function createMicrosoftProvider(dependencies: Dependencies): Mail.Provider {
   /** Folder ids never change: looked up once per account (only a successful lookup is kept). */
   const hiddenFolders = new Map<string, ReadonlySet<string>>()
 
-  async function unreadConversationIds(caller: Graph.Caller, limit: number): Promise<string[]> {
-    const body = await request(caller, unreadInboxUrl(), {
-      headers: { Prefer: IMMUTABLE_IDS },
-    })
-    // Never an empty inbox for an answer that is not a list
-    if (!isRecord(body) || !Array.isArray(body.value)) {
-      throw new MailError(
-        'unavailable',
-        'Microsoft Graph listed unread mail without a `value` list',
-      )
+  /**
+   * Up to `limit` entries of a collection. Graph may answer a page with fewer entries than
+   * asked for and a next link, and an entry may fail to parse: the page is completed by
+   * following next links. The end (`more: false`) is Graph's, never the count of entries.
+   */
+  async function collect<Entry>(
+    caller: Graph.Caller,
+    path: string,
+    { limit, collection }: { limit: number; collection: Collection<Entry> },
+  ): Promise<{ entries: Entry[]; more: boolean }> {
+    const entries: Entry[] = []
+    let next: string | undefined = path
+    for (
+      let page = 0;
+      next !== undefined && entries.length < limit && page < MAX_PAGES;
+      page += 1
+    ) {
+      // Each page names the next one
+      // eslint-disable-next-line eslint/no-await-in-loop
+      const body = await request(caller, next, { headers: collection.headers ?? {} })
+      entries.push(...collection.parse(assertList(body, collection.what)))
+      next = graphClient.nextPage(body)
     }
-    const unread = microsoftMessages.parseList(body)
-    return [...new Set(unread.map(entry => entry.conversationId))].slice(0, limit)
+    return { entries: entries.slice(0, limit), more: next !== undefined }
   }
 
-  async function loadThreads(caller: Graph.Caller, limit: number): Promise<Mail.Thread[]> {
-    const { accountId } = caller
-    const conversationIds = await unreadConversationIds(caller, limit)
-    if (conversationIds.length === 0) {
-      return []
+  /**
+   * The ids of the newest `limit` unread messages: requests of 1,000, each continuing by time
+   * from the last message of the one before (it repeats, and is counted once), which stays
+   * right when mail is read while the listing runs. It ends when Graph has no more, or when a
+   * request brings nothing new (more messages of one second than a request holds).
+   */
+  async function listIds(caller: Graph.Caller, limit: number): Promise<Mail.ListedMessage[]> {
+    const found = new Map<string, Mail.ListedMessage>()
+    const collection = {
+      what: 'unread mail',
+      headers: { Prefer: IMMUTABLE_IDS },
+      parse: microsoftMessages.parseListed,
     }
-    const cachedFolders = hiddenFolders.get(accountId)
+    let listing: Mail.Listing | undefined = { limit: ID_PAGE }
+    while (listing && found.size < limit) {
+      // Each request continues where the last one ended
+      // eslint-disable-next-line eslint/no-await-in-loop
+      const { entries, more }: { entries: Mail.ListedMessage[]; more: boolean } = await collect(
+        caller,
+        unreadInboxUrl(listing, LISTED_FIELDS),
+        { limit: ID_PAGE, collection },
+      )
+      const fresh = entries.filter(entry => !found.has(entry.id))
+      for (const entry of fresh) {
+        found.set(entry.id, entry)
+      }
+      const last = entries.at(-1)
+      listing =
+        more && fresh.length > 0 && last ? { limit: ID_PAGE, before: last.receivedAt } : undefined
+    }
+    return [...found.values()].slice(0, limit)
+  }
+
+  function listUnreadIds(
+    connection: Mail.Connection,
+    { limit }: { limit: number },
+  ): Promise<Mail.ListedMessage[]> {
+    return providerAuth.withToken(connection, token => listIds(callerOf(connection, token), limit))
+  }
+
+  async function listUnread(
+    connection: Mail.Connection,
+    listing: Mail.Listing,
+  ): Promise<Mail.Envelope[]> {
+    const url = unreadInboxUrl(listing, ENVELOPE_FIELDS, { $expand: LIST_UNSUBSCRIBE_EXPAND })
+    const collection = {
+      what: 'unread mail',
+      headers: { Prefer: `${IMMUTABLE_IDS}, ${TEXT_BODIES}` },
+      parse: microsoftMessages.parseEnvelopes,
+    }
+    const { entries } = await providerAuth.withToken(connection, token =>
+      collect(callerOf(connection, token), url, { limit: listing.limit, collection }),
+    )
+    return entries
+  }
+
+  async function listSent(
+    connection: Mail.Connection,
+    { limit }: { limit: number },
+  ): Promise<Mail.SentEnvelope[]> {
+    const url = `/me/mailFolders/sentitems/messages?${query({
+      $select: SENT_FIELDS.join(','),
+      $orderby: 'sentDateTime desc',
+      $top: String(limit),
+    })}`
+    const collection = { what: 'sent mail', parse: microsoftMessages.parseSent }
+    const { entries } = await providerAuth.withToken(connection, token =>
+      collect(callerOf(connection, token), url, { limit, collection }),
+    )
+    return entries
+  }
+
+  async function loadConversations(
+    caller: Graph.Caller,
+    conversationIds: readonly string[],
+  ): Promise<Mail.LoadedThreads> {
+    const cachedFolders = hiddenFolders.get(caller.accountId)
     const responses = await batch(caller, [
       ...(cachedFolders ? [] : HIDDEN_FOLDERS.map(folder => folderRequest(folder))),
       ...conversationIds.map((id, index) => conversationRequest(id, index)),
@@ -213,17 +352,20 @@ function createMicrosoftProvider(dependencies: Dependencies): Mail.Provider {
     let folders = cachedFolders
     if (!folders) {
       folders = new Set(HIDDEN_FOLDERS.map(folder => folderId(responses, folder)))
-      hiddenFolders.set(accountId, folders)
+      hiddenFolders.set(caller.accountId, folders)
     }
     return toThreads({ conversationIds, hiddenFolderIds: folders }, responses)
   }
 
-  async function listUnreadThreads(
+  async function loadThreads(
     connection: Mail.Connection,
-    { limit }: { limit: number },
-  ): Promise<Mail.Thread[]> {
+    threadIds: readonly string[],
+  ): Promise<Mail.LoadedThreads> {
+    if (threadIds.length === 0) {
+      return { threads: [], finished: [] }
+    }
     return providerAuth.withToken(connection, token =>
-      loadThreads({ accountId: connection.account.id, token }, limit),
+      loadConversations(callerOf(connection, token), threadIds),
     )
   }
 
@@ -299,7 +441,10 @@ function createMicrosoftProvider(dependencies: Dependencies): Mail.Provider {
   return {
     // `Mail.ReadWrite` to read and mark as read (the smallest scope that can), `Mail.Send` to send replies and forwards
     mailScopes: ['Mail.ReadWrite', 'Mail.Send'],
-    listUnreadThreads,
+    listUnreadIds,
+    listUnread,
+    loadThreads,
+    listSent,
     setRead,
     reply,
     forward,
