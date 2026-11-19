@@ -11,7 +11,9 @@ import sync from '#server/ranking/sync'
 
 /*
  * The golden test: the order of the seven demo threads, by the rules alone and with the
- * demo judge, as the plan computes it. Update it on purpose whenever a weight changes.
+ * demo judge, which gives the answers Jev gave about them. Update it on purpose whenever
+ * a weight changes; `pnpm ranking:demo-answers` asks Jev again and updates the second
+ * order here.
  */
 
 const NOW = new Date('2026-10-12T10:30:00Z')
@@ -62,20 +64,23 @@ describe('ranking: the demo threads (golden)', () => {
     ])
   })
 
-  it('are ordered with the demo judge, which moves the delivery notice to the lowest tier', async () => {
+  it("are ordered with the demo judge, by Jev's answers", async () => {
     expect.hasAssertions()
 
     const { ranked } = await rankDemo(createDemoJudge())
 
-    expect(ranked).toStrictEqual([
-      { thread: 'thread-migration-plan', score: 100, tier: 'high' },
-      { thread: 'thread-vendor-review', score: 93, tier: 'high' },
-      { thread: 'thread-offsite-venue', score: 89, tier: 'high' },
-      { thread: 'thread-staging', score: 65, tier: 'normal' },
-      { thread: 'thread-scan', score: 40, tier: 'normal' },
-      { thread: 'thread-delivery', score: 22, tier: 'low' },
-      { thread: 'thread-newsletter', score: 0, tier: 'low' },
-    ])
+    expect(ranked.map(({ thread, score, tier }) => `${thread}: ${score}, ${tier}`))
+      .toMatchInlineSnapshot(`
+        [
+          "thread-vendor-review: 100, high",
+          "thread-migration-plan: 100, high",
+          "thread-offsite-venue: 94, high",
+          "thread-staging: 60, normal",
+          "thread-scan: 40, normal",
+          "thread-delivery: 26, low",
+          "thread-newsletter: 0, low",
+        ]
+      `)
   })
 
   it('explain themselves as the example threads say, with the suggestion where it belongs', async () => {

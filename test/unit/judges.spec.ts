@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vite-plus/test'
 import createJudges from '#server/ranking/judges'
+import demoAnswers from '#server/ranking/judges/demo-answers.json'
 import mailFakes from './mail-fakes'
 
 const demo = { ...mailFakes.mailbox('demo-account'), providerId: 'demo' }
@@ -17,11 +18,15 @@ function judgeIds(options: { apiKey?: string; model?: string; development: boole
 
 describe('ranking: the judge of a mailbox', () => {
   it.each([
-    ['development without a key', { development: true }, { demo: 'demo/1', microsoft: undefined }],
+    [
+      'development without a key',
+      { development: true },
+      { demo: 'demo/jev-1.14.0/1', microsoft: undefined },
+    ],
     [
       'development with a key',
       { development: true, apiKey: 'key' },
-      { demo: 'demo/1', microsoft: 'jev-1.14.0/1' },
+      { demo: 'demo/jev-1.14.0/1', microsoft: 'jev-1.14.0/1' },
     ],
     [
       'production with a key',
@@ -35,5 +40,10 @@ describe('ranking: the judge of a mailbox', () => {
     ],
   ])('in %s', (_, options, expected) => {
     expect(judgeIds(options)).toStrictEqual(expected)
+  })
+
+  it("gives the demo judge the pinned Jev's answers", () => {
+    // After a new model or new questions, `pnpm ranking:demo-answers` asks Jev again
+    expect(demoAnswers.judge).toBe(judgeIds({ development: false, apiKey: 'key' }).microsoft)
   })
 })

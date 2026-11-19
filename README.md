@@ -64,10 +64,10 @@ What leaves the server: the complete text of every unread Inbox message goes to 
 
 What is stored: `unread_messages` holds one row per unread message (message and conversation ids, facts, Jev's probabilities, the score, timestamps), `mailbox_profiles` one per mailbox (whom it writes to, as keyed hashes of the addresses, and when it was last scanned, listed and synced). No subject, text or readable address. The hashes are HMAC-SHA-256 with a key derived from `BETTER_AUTH_SECRET`; a new secret rescans Sent Items. A message you resolved in Linelo that the mailbox still lists as unread two minutes later (marked unread again in Outlook, or a reply whose marking as read failed) comes back: the mailbox stays the truth.
 
-| Variable           | Purpose                                                                                                                                                                               |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `TYPESAFE_API_KEY` | TypeSafe AI's API key for Jev. Required outside development. Without it the dev server gives the demo mailbox canned answers, ranks other mail by the rules alone and logs that once. |
-| `JEV_MODEL`        | Optional: another Jev version than the pinned `jev-1.14.0`, to try it before the pin changes. Messages judged by another version are judged again by the next syncs.                  |
+| Variable           | Purpose                                                                                                                                                              |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TYPESAFE_API_KEY` | TypeSafe AI's API key for Jev. Required outside development. Without it the dev server ranks mail other than the demo mailbox by the rules alone and logs that once. |
+| `JEV_MODEL`        | Optional: another Jev version than the pinned `jev-1.14.0`, to try it before the pin changes. Messages judged by another version are judged again by the next syncs. |
 
 The inbox API, as the page uses it, one request to the mailbox at a time (Outlook allows about four at once, and a sync step uses them):
 
@@ -75,6 +75,8 @@ The inbox API, as the page uses it, one request to the mailbox at a time (Outloo
 2. `POST /api/inbox/sync` with `{ "start": true }`, the starting batch (the newest 50 messages read and judged), then `GET /api/inbox?limit=4` without `start`.
 3. `POST /api/inbox/sync` with `{ "start": false }` until it answers `{ "status": "done" }`; on `busy` (another tab is syncing the mailbox) a second's wait before asking again. Then `GET /api/inbox?limit=20`, which the page also asks for when two items are left.
 4. After an action, a sync once the last one is two minutes old, then `GET` again; after Undo, a sync, so a message a listing removed meanwhile comes back.
+
+The demo mailbox never calls Jev: its judge gives the answers Jev gave about each example message when it was last asked, frozen in `server/ranking/judges/demo-answers.json`. `pnpm ranking:demo-answers` asks again, with `TYPESAFE_API_KEY` in `.env` and one call per example message, and updates the demo's order in `test/unit/ranking-golden.spec.ts`. Run it after changing an example thread, the questions or the pinned model. When a "why shown" line changes with it, the golden spec names the line to change in `shared/data/inbox-fixtures.ts`.
 
 Every sync step that asked Jev logs one line with the number of messages judged and the input tokens they cost. In development the server also logs each item's score and factors, so an odd order can be traced to a factor and the weights changed in `server/ranking/score.ts`. The weights are first guesses, checked against the demo threads (`test/unit/ranking-golden.spec.ts`) and nothing else yet.
 

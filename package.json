@@ -18,6 +18,7 @@
     "db:studio:production": "DOTENV_CONFIG_PATH=.env.production drizzle-kit studio",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
+    "ranking:demo-answers": "vp test --config test/unit/refresh.config.ts && vp test test/unit/ranking-golden.spec.ts --project unit --update && vp fmt server/ranking/judges/demo-answers.json test/unit/ranking-golden.spec.ts",
     "postinstall": "nuxt prepare",
     "storybook": "storybook dev -p 6006",
     "storybook:build": "storybook build"

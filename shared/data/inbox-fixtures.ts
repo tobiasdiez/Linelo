@@ -71,7 +71,7 @@ function vendorReview(ago: (offset: TimeAgo) => string): Inbox.QueueItem {
         },
       ],
     },
-    whyShown: 'From someone you have written to. Reads like it asks you for an answer.',
+    whyShown: 'Reads like it is needed soon. From someone you have written to.',
     tier: 'high',
     assisted: true,
     suggestions: [
@@ -256,7 +256,7 @@ function migrationPlan(ago: (offset: TimeAgo) => string): Inbox.QueueItem {
         },
       ],
     },
-    whyShown: 'From someone you write to often. Reads like it asks you for an answer.',
+    whyShown: 'From someone you write to often. Mentions today or a day close by.',
     tier: 'high',
     assisted: true,
     suggestions: [
