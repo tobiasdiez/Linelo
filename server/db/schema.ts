@@ -168,7 +168,7 @@ const calendarDecisions = pgTable(
 )
 
 /**
- * One row per unread inbox message Linelo knows of (`server/ranking/index-store.ts`):
+ * One row per unread message Linelo knows of (`server/ranking/index-store.ts`):
  * ids, facts and numbers, no subject, text or readable address.
  */
 const unreadMessages = pgTable(

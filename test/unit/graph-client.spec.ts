@@ -13,6 +13,15 @@ function urlOf(input: Parameters<typeof globalThis.fetch>[0]): string {
   return input instanceof Request ? input.url : input.toString()
 }
 
+/** A collection of two pages: one entry and a next link, then `last`. */
+function twoPages(last: unknown) {
+  return vi.fn<typeof globalThis.fetch>(async input =>
+    new URL(urlOf(input)).searchParams.has('page')
+      ? Response.json(last)
+      : Response.json({ 'value': ['first'], '@odata.nextLink': `${GRAPH}/me/calendars?page=1` }),
+  )
+}
+
 describe('graph client', () => {
   it('calls Graph with the token and a JSON body, and returns the parsed answer', async () => {
     expect.hasAssertions()
@@ -214,6 +223,41 @@ describe('graph client', () => {
       `${GRAPH}/me/calendars?page=1`,
       `${GRAPH}/me/calendars?page=2`,
     ])
+  })
+
+  it('collects entries across pages up to the limit, and fails on any page that is not a list', async () => {
+    expect.hasAssertions()
+    const collection = {
+      what: 'calendars',
+      parse: (body: unknown) => graphClient.values(body).map(String),
+    }
+
+    await expect(
+      graphClient
+        .create({ fetch: twoPages({ value: ['second', 'third'] }) })
+        .collect(caller, '/me/calendars', { limit: 2, collection }),
+    ).resolves.toStrictEqual({ entries: ['first', 'second'], more: false })
+    // A later page without a list is not the end of the collection
+    await expect(
+      graphClient
+        .create({ fetch: twoPages({ error: 'none' }) })
+        .collect(caller, '/me/calendars', { limit: 2, collection }),
+    ).rejects.toMatchObject({
+      kind: 'unavailable',
+      message: 'Microsoft Graph listed calendars without a `value` list',
+    })
+  })
+
+  it('reports what Graph said for a request that failed inside a batch', () => {
+    const response = {
+      id: 'request-1',
+      status: httpStatus.tooManyRequests,
+      body: { error: { code: 'ApplicationThrottled', message: 'Too many requests.' } },
+    }
+
+    expect(() => graphClient.assertSucceeded(response, 'list calendars')).toThrow(
+      'Microsoft Graph could not list calendars: 429 ApplicationThrottled: Too many requests. (request-id unknown)',
+    )
   })
 
   it('does not follow a nextLink that leaves Graph', async () => {

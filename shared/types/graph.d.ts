@@ -49,6 +49,29 @@ declare namespace Graph {
     sendsMail?: boolean
   }
 
+  /**
+   * How to read a collection: what to call it in errors, the headers, how to parse a page,
+   * and how many pages to read at most (5 unless given).
+   */
+  interface Collection<Entry> {
+    what: string
+    headers?: Record<string, string>
+    parse: (body: unknown) => Entry[]
+    maxPages?: number
+  }
+
+  /** The entries read of a collection, and whether Graph has more. */
+  interface Collected<Entry> {
+    entries: Entry[]
+    more: boolean
+  }
+
+  /** One of several collections read at once: where it starts, and how many entries to read. */
+  interface Reading {
+    path: string
+    limit: number
+  }
+
   /** Who a Graph call is for: the mailbox, and the token to call with. */
   interface Caller {
     accountId: string
@@ -71,6 +94,27 @@ declare namespace Graph {
       caller: Caller,
       requests: readonly BatchRequest[],
     ) => Promise<Map<string, BatchResponse>>
+    /**
+     * Up to `limit` entries of the collection at `path`, completed by next links when Graph
+     * answers short or an entry does not parse. Fails `unavailable` on a page that is not a list.
+     */
+    collect: <Entry>(
+      caller: Caller,
+      path: string,
+      options: { limit: number; collection: Collection<Entry> },
+    ) => Promise<Collected<Entry>>
+    /** `collect` for a collection whose first page is `body`, such as an answer inside a batch. */
+    collectFrom: <Entry>(
+      caller: Caller,
+      body: unknown,
+      options: { limit: number; collection: Collection<Entry> },
+    ) => Promise<Collected<Entry>>
+    /** `collect` for several collections at once: their first pages in batches, the rest by next links. */
+    collectEach: <Entry, Read extends Reading>(
+      caller: Caller,
+      readings: readonly Read[],
+      collection: Collection<Entry>,
+    ) => Promise<(Read & Collected<Entry>)[]>
     /** The entries of a collection, following `@odata.nextLink` for at most `maxPages` pages. */
     list: (
       caller: Caller,
