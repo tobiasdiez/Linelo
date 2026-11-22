@@ -96,11 +96,18 @@ declare namespace Mail {
      */
     mailScopes: readonly string[]
     /**
-     * The ids of the newest `limit` unread inbox messages, newest first, paged inside the
-     * adapter: fewer only when the inbox has no more unread mail.
+     * The ids of the newest `limit` unread messages, newest first, paged inside the adapter:
+     * fewer only when the mailbox has no more unread mail. Unread mail is mail that waits on
+     * the owner, in any folder except those for deleted, junk, sent, draft, archived and
+     * scheduled mail.
      */
     listUnreadIds: (connection: Connection, options: { limit: number }) => Promise<ListedMessage[]>
-    /** The envelopes of unread inbox messages with their texts, newest first; fewer than `limit` only at the end. */
+    /**
+     * The envelopes of unread messages, as `listUnreadIds` counts them, with their texts,
+     * newest first; fewer than `limit` only at the end, or when mail was read meanwhile. A
+     * page holds every unread message from its oldest one up to `before`: the sync takes
+     * what a page lacks in that span as read.
+     */
     listUnread: (connection: Connection, listing: Listing) => Promise<Envelope[]>
     /** The threads of these conversations, in this order. One with nothing unread left is left out of `threads`. */
     loadThreads: (connection: Connection, threadIds: readonly string[]) => Promise<LoadedThreads>

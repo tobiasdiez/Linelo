@@ -76,16 +76,34 @@ function assertAuthorized(response: Graph.BatchResponse | undefined): void {
   }
 }
 
-/** Throws for a failed response inside a batch: 401 to refresh the token, anything else as unavailable. */
+/**
+ * Throws for a failed response inside a batch: 401 to refresh the token, anything else as
+ * unavailable, with what Graph said for the server log.
+ */
 function assertSucceeded(
   response: Graph.BatchResponse | undefined,
   what: string,
 ): Graph.BatchResponse {
   assertAuthorized(response)
-  if (!response || !httpStatus.isSuccess(response.status)) {
-    throw new MailError('unavailable', `Microsoft Graph could not ${what} (${response?.status})`)
+  if (!response) {
+    throw new MailError('unavailable', `Microsoft Graph could not ${what} (no answer in the batch)`)
+  }
+  if (!httpStatus.isSuccess(response.status)) {
+    const refusal = refusalOf({ ...response, requestId: undefined })
+    throw new MailError(
+      'unavailable',
+      `Microsoft Graph could not ${what}: ${said(response.status, refusal)}`,
+    )
   }
   return response
+}
+
+/** The body of a collection page; never an empty list for an answer that is not one. */
+function assertList(body: unknown, what: string): unknown {
+  if (!isRecord(body) || !Array.isArray(body.value)) {
+    throw new MailError('unavailable', `Microsoft Graph listed ${what} without a \`value\` list`)
+  }
+  return body
 }
 
 /** Parses a body that may be empty: Graph answers 204 (and some 202s) without one. */
@@ -220,7 +238,64 @@ function createGraphClient({ fetch, timeoutMs = DEFAULT_TIMEOUT_MS }: Dependenci
     return entries
   }
 
-  return { send, request, batch, list }
+  /**
+   * Up to `limit` entries of a collection whose first page is `body`. Graph may answer a
+   * page with fewer entries than asked for and a next link, and an entry may fail to parse:
+   * the entries are completed by following next links, for at most `maxPages` pages. Every
+   * page must be a list. The end (`more: false`) is Graph's, never the count of entries.
+   */
+  async function collectFrom<Entry>(
+    caller: Graph.Caller,
+    body: unknown,
+    { limit, collection }: { limit: number; collection: Graph.Collection<Entry> },
+  ): Promise<Graph.Collected<Entry>> {
+    const { what, headers = {}, parse, maxPages = DEFAULT_MAX_PAGES } = collection
+    const entries = parse(assertList(body, what))
+    let next = nextPage(body)
+    for (let page = 1; next !== undefined && entries.length < limit && page < maxPages; page += 1) {
+      // Each page names the next one
+      // eslint-disable-next-line eslint/no-await-in-loop
+      const nextBody = await request(caller, next, { headers })
+      entries.push(...parse(assertList(nextBody, what)))
+      next = nextPage(nextBody)
+    }
+    return { entries: entries.slice(0, limit), more: next !== undefined }
+  }
+
+  async function collect<Entry>(
+    caller: Graph.Caller,
+    path: string,
+    options: { limit: number; collection: Graph.Collection<Entry> },
+  ): Promise<Graph.Collected<Entry>> {
+    const body = await request(caller, path, { headers: options.collection.headers ?? {} })
+    return collectFrom(caller, body, options)
+  }
+
+  async function collectEach<Entry, Read extends Graph.Reading>(
+    caller: Graph.Caller,
+    readings: readonly Read[],
+    collection: Graph.Collection<Entry>,
+  ): Promise<(Read & Graph.Collected<Entry>)[]> {
+    const responses = await batch(
+      caller,
+      readings.map(({ path }, index) => ({
+        id: `reading-${index}`,
+        method: 'GET',
+        url: path,
+        headers: collection.headers ?? {},
+      })),
+    )
+    const what = `list ${collection.what}`
+    return Promise.all(
+      readings.map(async (reading, index) => {
+        const { body } = assertSucceeded(responses.get(`reading-${index}`), what)
+        const collected = await collectFrom(caller, body, { limit: reading.limit, collection })
+        return { ...reading, ...collected }
+      }),
+    )
+  }
+
+  return { send, request, batch, list, collect, collectFrom, collectEach }
 }
 
 const graphClient = {
